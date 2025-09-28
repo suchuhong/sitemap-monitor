@@ -57,12 +57,8 @@
           "name": "changes_site_id_sites_id_fk",
           "tableFrom": "changes",
           "tableTo": "sites",
-          "columnsFrom": [
-            "site_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["site_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -70,12 +66,8 @@
           "name": "changes_url_id_urls_id_fk",
           "tableFrom": "changes",
           "tableTo": "urls",
-          "columnsFrom": [
-            "url_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["url_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -169,12 +161,8 @@
           "name": "scans_site_id_sites_id_fk",
           "tableFrom": "scans",
           "tableTo": "sites",
-          "columnsFrom": [
-            "site_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["site_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -258,12 +246,8 @@
           "name": "sitemaps_site_id_sites_id_fk",
           "tableFrom": "sitemaps",
           "tableTo": "sites",
-          "columnsFrom": [
-            "site_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["site_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -333,12 +317,8 @@
           "name": "sites_owner_id_users_id_fk",
           "tableFrom": "sites",
           "tableTo": "users",
-          "columnsFrom": [
-            "owner_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["owner_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -429,12 +409,8 @@
           "name": "urls_site_id_sites_id_fk",
           "tableFrom": "urls",
           "tableTo": "sites",
-          "columnsFrom": [
-            "site_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["site_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -442,12 +418,8 @@
           "name": "urls_sitemap_id_sitemaps_id_fk",
           "tableFrom": "urls",
           "tableTo": "sitemaps",
-          "columnsFrom": [
-            "sitemap_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["sitemap_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -484,9 +456,7 @@
       "indexes": {
         "users_email_unique": {
           "name": "users_email_unique",
-          "columns": [
-            "email"
-          ],
+          "columns": ["email"],
           "isUnique": true
         }
       },
@@ -540,12 +510,8 @@
           "name": "webhooks_site_id_sites_id_fk",
           "tableFrom": "webhooks",
           "tableTo": "sites",
-          "columnsFrom": [
-            "site_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["site_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
