@@ -1,6 +1,11 @@
 import { setTimeout as sleep } from "timers/promises";
 
-export async function fetchWithCompression(url: string, opts: any = {}) {
+type FetchOptions = Omit<RequestInit, "signal"> & {
+  timeout?: number;
+  headers?: Record<string, string>;
+};
+
+export async function fetchWithCompression(url: string, opts: FetchOptions = {}) {
   const { timeout = 10000, headers = {}, ...rest } = opts;
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);

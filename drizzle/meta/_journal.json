@@ -8,6 +8,20 @@
       "when": 1759081107796,
       "tag": "0000_sleepy_stone_men",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1759167854000,
+      "tag": "0010_add_site_tags",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1759168080537,
+      "tag": "0002_nostalgic_tomorrow_man",
+      "breakpoints": true
     }
   ]
 }

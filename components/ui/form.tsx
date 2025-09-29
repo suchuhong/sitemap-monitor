@@ -1,6 +1,15 @@
 "use client";
 import * as React from "react";
-import { Controller, FormProvider, useFormContext } from "react-hook-form";
+import {
+  Controller,
+  FormProvider,
+  useFormContext,
+  type ControllerRenderProps,
+  type FieldPath,
+  type FieldValues,
+  type FieldState,
+  type UseFormStateReturn,
+} from "react-hook-form";
 import { Label } from "./label";
 import { cn } from "@/lib/utils";
 
@@ -32,15 +41,31 @@ export function FormMessage({ children }: { children?: React.ReactNode }) {
   return <p className="text-sm text-red-600">{children}</p>;
 }
 
-export const FormField = ({
+type RenderArgs<
+  TFieldValues extends FieldValues,
+  TName extends FieldPath<TFieldValues>,
+> = {
+  field: ControllerRenderProps<TFieldValues, TName>;
+  fieldState: FieldState;
+  formState: UseFormStateReturn<TFieldValues>;
+};
+
+export function FormField<
+  TFieldValues extends FieldValues = FieldValues,
+  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
+>({
   name,
   render,
 }: {
-  name: string;
-  render: (opts: any) => React.ReactNode;
-}) => {
-  const methods = useFormContext();
+  name: TName;
+  render: (args: RenderArgs<TFieldValues, TName>) => React.ReactNode;
+}) {
+  const methods = useFormContext<TFieldValues>();
   return (
-    <Controller name={name} control={methods.control} render={render as any} />
+    <Controller
+      name={name}
+      control={methods.control}
+      render={(props) => render(props as RenderArgs<TFieldValues, TName>)}
+    />
   );
-};
+}

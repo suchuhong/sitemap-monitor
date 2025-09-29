@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import * as React from "react";
 import {
   ColumnDef,
@@ -23,6 +24,8 @@ type Site = {
   rootUrl: string;
   robotsUrl: string | null;
   createdAt: string | number | null;
+  enabled?: boolean | null;
+  tags?: string[] | null;
 };
 
 const columns: ColumnDef<Site>[] = [
@@ -30,9 +33,9 @@ const columns: ColumnDef<Site>[] = [
     accessorKey: "rootUrl",
     header: "站点",
     cell: ({ row }) => (
-      <a className="underline" href={`/sites/${row.original.id}`}>
+      <Link className="underline" href={`/sites/${row.original.id}`}>
         {row.getValue("rootUrl") as string}
-      </a>
+      </Link>
     ),
   },
   {
@@ -46,8 +49,42 @@ const columns: ColumnDef<Site>[] = [
     accessorKey: "createdAt",
     header: "创建时间",
     cell: ({ getValue }) => {
-      const v = getValue() as any;
-      return <span>{v ? new Date(v).toLocaleString() : "—"}</span>;
+      const value = getValue();
+      const date = coerceDate(value);
+      return <span>{date ? date.toLocaleString() : "—"}</span>;
+    },
+  },
+  {
+    accessorKey: "enabled",
+    header: "状态",
+    cell: ({ getValue }) => {
+      const enabled = Boolean(getValue());
+      return (
+        <span className={enabled ? "text-emerald-600" : "text-slate-500"}>
+          {enabled ? "启用" : "禁用"}
+        </span>
+      );
+    },
+  },
+  {
+    accessorKey: "tags",
+    header: "标签",
+    cell: ({ getValue }) => {
+      const tags = Array.isArray(getValue()) ? (getValue() as string[]) : [];
+      return tags.length ? (
+        <div className="flex flex-wrap gap-1 text-xs">
+          {tags.map((tag) => (
+            <span
+              key={tag}
+              className="rounded-full bg-blue-50 px-2 py-0.5 text-blue-600 dark:bg-blue-900/40 dark:text-blue-200"
+            >
+              {tag}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <span className="text-slate-400">—</span>
+      );
     },
   },
 ];
@@ -70,7 +107,7 @@ export function SitesTable({ data }: { data: Site[] }) {
 
   React.useEffect(() => {
     table.setPageSize(pageSize);
-  }, [pageSize]);
+  }, [pageSize, table]);
 
   return (
     <div className="space-y-3">
@@ -155,4 +192,13 @@ export function SitesTable({ data }: { data: Site[] }) {
 // Minimal table primitives styled with Tailwind
 export function TableWrapper({ children }: { children: React.ReactNode }) {
   return <div className="overflow-x-auto">{children}</div>;
+}
+
+function coerceDate(value: unknown) {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  const num = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(num)) return null;
+  const millis = num > 1e12 ? num : num * 1000;
+  return new Date(millis);
 }

@@ -4,9 +4,10 @@ Sitemap Monitor 是一个基于 Next.js 15 的示例项目，用于接入站点�
 
 ## 功能概览
 
-- **站点接入**：在 `/sites/new` 提交根地址，系统会抓取 `robots.txt` 与候选 sitemap。
+- **站点接入/管理**：在 `/sites/new` 提交根地址，列表中可直接启用/禁用、删除站点。
 - **Sitemap 递归解析**：使用 `fast-xml-parser` 解析 sitemap / sitemap index，自动补全子 sitemap。
 - **变更监控**：通过 `scanSite` / `cronScan` 任务对比 URL 列表生成新增与删除记录。
+- **站点详情视图**：`/sites/:id` 页面展示 sitemap 列表、最新扫描与变更汇总。
 - **Webhook 通知**：`notifyChange` 会生成签名，实际项目可扩展为发布到外部回调。
 - **Dashboard**：`/dashboard` 直接读取数据库统计站点数量、24h 变更与扫描失败率。
 
@@ -104,7 +105,46 @@ Sitemap Monitor 是一个基于 Next.js 15 的示例项目，用于接入站点�
   - `400 Bad Request`：请求体无法通过 Zod 验证。
   - `500 Internal Server Error`：网络请求或数据库错误。
 
-### 2. 手动扫描 `POST /api/sites/:id/scan`
+### 2. 查看站点详情 `GET /api/sites/:id`
+
+- **作用**：返回指定站点的基础信息、sitemap 列表、最近扫描与变更。
+- **成功响应**：`200 OK`
+  ```json
+  {
+    "site": { "id": "uuid", "rootUrl": "https://example.com", "robotsUrl": "..." },
+    "summary": { "totalUrls": 120, "activeUrls": 118, "inactiveUrls": 2 },
+    "sitemaps": [
+      {
+        "id": "...",
+        "url": "https://example.com/sitemap.xml",
+        "urlCounts": { "total": 120, "active": 118, "inactive": 2 },
+        "lastStatus": 200
+      }
+    ],
+    "recentScans": [
+      { "id": "...", "status": "success", "totalUrls": 120, "added": 1, "removed": 0 }
+    ],
+    "recentChanges": [
+      { "id": "...", "type": "added", "detail": "https://example.com/new" }
+    ]
+  }
+  ```
+- **失败响应**：`404 Not Found` 当站点不存在或不属于当前用户时。
+
+### 3. 更新站点 `PATCH /api/sites/:id`
+
+- **作用**：修改站点根地址（会重新发现 sitemap）或启用/禁用监控。
+- **请求体示例**：`{ "rootUrl": "https://example.com", "enabled": true }`（至少包含一个字段）。
+- **成功响应**：`200 OK`，返回与详情接口一致的结构。
+- **失败响应**：`400 Bad Request` 当未提供任何字段；`404 Not Found` 当站点不存在或无权限。
+
+### 4. 删除站点 `DELETE /api/sites/:id`
+
+- **作用**：移除站点及其 sitemap、URL、扫描与变更数据。
+- **成功响应**：`200 OK` `{ "ok": true }`
+- **失败响应**：`404 Not Found` 当站点不存在或无权限。
+
+### 5. 手动扫描 `POST /api/sites/:id/scan`
 
 - **作用**：触发一次 sitemap 扫描并写入 `scans`、`urls`、`changes`。
 - **成功响应**：`200 OK`
@@ -112,7 +152,7 @@ Sitemap Monitor 是一个基于 Next.js 15 的示例项目，用于接入站点�
   { "scanId": "uuid", "totalUrls": 120, "added": 5, "removed": 1 }
   ```
 
-### 3. Cron 扫描 `POST /api/cron/scan`
+### 6. Cron 扫描 `POST /api/cron/scan`
 
 - **Headers**：`Authorization: Bearer <CRON_TOKEN>`。
 - **作用**：遍历 `sites` 表，对每个站点执行 `scanSite`。
@@ -125,7 +165,7 @@ Sitemap Monitor 是一个基于 Next.js 15 的示例项目，用于接入站点�
   ```
 - **失败响应**：`401 Unauthorized` 当缺少或提供错误的 token 时。
 
-### 4. 批量导入 `POST /api/sites/import`
+### 7. 批量导入 `POST /api/sites/import`
 
 - **Body**：支持 `multipart/form-data`（`file` 字段）或纯文本字段 `csv`，每行一个 URL。
 - **成功响应**：`200 OK`，例如：
@@ -134,16 +174,16 @@ Sitemap Monitor 是一个基于 Next.js 15 的示例项目，用于接入站点�
   ```
 - **失败响应**：`400 Bad Request` 当未提供有效 CSV。
 
-### 5. 导出变更 `GET /api/sites/:id/changes.csv`
+### 8. 导出变更 `GET /api/sites/:id/changes.csv`
 
 - **Query 参数**：`type`（可选），`from`、`to`（ISO 日期，可选）。
 - **响应**：`text/csv`，包含 `type,detail,occurredAt` 列。
 
-### 6. 导出站点 `GET /api/sites/export.csv`
+### 9. 导出站点 `GET /api/sites/export.csv`
 
 - **响应**：`text/csv`，含 `id,rootUrl,robotsUrl,createdAt`。
 
-### 7. Webhook 管理
+### 10. Webhook 管理
 
 - `POST /api/sites/:id/webhooks`
   - Body：JSON 或表单；必填字段 `targetUrl`，可选 `secret`。

@@ -17,6 +17,7 @@ export const sites = sqliteTable("sites", {
   rootUrl: text("root_url").notNull(),
   robotsUrl: text("robots_url"),
   enabled: integer("enabled", { mode: "boolean" }).default(true),
+  tags: text("tags"),
   createdAt: integer("created_at", { mode: "timestamp" }).default(
     sql`(unixepoch())`,
   ),

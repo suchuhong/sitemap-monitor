@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Toaster, toast } from "@/components/ui/sonner";
+import { toast } from "@/components/ui/sonner";
 
 export function ConfirmScan({ siteId }: { siteId: string }) {
   const [loading, setLoading] = useState(false);

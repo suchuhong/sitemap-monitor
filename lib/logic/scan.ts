@@ -3,7 +3,7 @@ import { randomUUID } from "crypto";
 import { db } from "@/lib/db";
 import { sitemaps, urls, scans, changes, sites } from "@/lib/drizzle/schema";
 import { eq } from "drizzle-orm";
-import { fetchWithCompression } from "./net";
+import { fetchWithCompression, retry } from "./net";
 import { notifyChange } from "./notify";
 
 const xmlParser = new XMLParser({
@@ -12,10 +12,22 @@ const xmlParser = new XMLParser({
 });
 
 export async function cronScan() {
-  const allSites = await db.select().from(sites); // You can filter enabled=true
-  const results = [];
-  for (const s of allSites) results.push(await scanSite(s.id));
-  return { sites: allSites.length, results };
+  const activeSites = await db
+    .select()
+    .from(sites)
+    .where(eq(sites.enabled, true));
+  const results: Array<Record<string, unknown>> = [];
+  for (const s of activeSites) {
+    try {
+      results.push(await scanSite(s.id));
+    } catch (err) {
+      results.push({
+        siteId: s.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+  return { sites: activeSites.length, results };
 }
 
 export async function scanSite(siteId: string) {
@@ -28,96 +40,256 @@ export async function scanSite(siteId: string) {
     .from(sitemaps)
     .where(eq(sitemaps.siteId, siteId));
 
-  let totalUrls = 0,
-    added = 0,
-    removed = 0;
+  let totalUrls = 0;
+  let added = 0;
+  let removed = 0;
+  const errors: string[] = [];
+
   for (const sm of smaps) {
-    const r = await scanOneSitemap(siteId, sm);
-    totalUrls += r.urlCount;
-    added += r.urlsAdded;
-    removed += r.urlsRemoved;
+    try {
+      const r = await scanOneSitemap(siteId, sm);
+      totalUrls += r.urlCount;
+      added += r.urlsAdded;
+      removed += r.urlsRemoved;
+    } catch (err) {
+      errors.push(`${sm.url}: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
+
+  const status = errors.length ? "failed" : "success";
+  const finishedAt = new Date();
 
   await db
     .update(scans)
     .set({
-      status: "success",
-      finishedAt: new Date(),
+      status,
+      finishedAt,
       totalSitemaps: smaps.length,
       totalUrls,
       added,
       removed,
+      error: errors.length ? errors.join("; ") : null,
     })
     .where(eq(scans.id, scanId));
 
-  if (added || removed) await notifyChange(siteId, { scanId, added, removed });
-  return { scanId, totalUrls, added, removed };
+  if (!errors.length && (added || removed)) {
+    try {
+      await notifyChange(siteId, { scanId, added, removed });
+    } catch (err) {
+      console.warn("webhook notify failed", siteId, err);
+    }
+  }
+
+  if (errors.length) {
+    return { siteId, scanId, totalUrls, added, removed, status, errors };
+  }
+
+  return { siteId, scanId, totalUrls, added, removed, status };
 }
 
-async function scanOneSitemap(siteId: string, sm: any) {
+type SitemapRow = typeof sitemaps.$inferSelect;
+
+type ParsedSitemapUrl = {
+  loc: string;
+  lastmod?: string;
+  changefreq?: string;
+  priority?: string;
+};
+
+async function scanOneSitemap(siteId: string, sm: SitemapRow) {
   const headers: Record<string, string> = {};
   if (sm.lastEtag) headers["If-None-Match"] = sm.lastEtag;
   if (sm.lastModified) headers["If-Modified-Since"] = sm.lastModified;
 
-  const res = await fetchWithCompression(sm.url, { timeout: 12000, headers });
-  if (res.status === 304)
-    return { changed: false, urlsAdded: 0, urlsRemoved: 0, urlCount: 0 };
-  if (!res.ok)
-    return { changed: false, urlsAdded: 0, urlsRemoved: 0, urlCount: 0 };
+  let res: Response;
+  try {
+    res = await retry(() => fetchWithCompression(sm.url, { timeout: 12000, headers }), 2);
+  } catch (err) {
+    await db
+      .update(sitemaps)
+      .set({ lastStatus: null, updatedAt: new Date() })
+      .where(eq(sitemaps.id, sm.id));
+    throw err;
+  }
 
-  const xml = xmlParser.parse(await res.text());
-  const list = xml.urlset?.url
-    ? Array.isArray(xml.urlset.url)
-      ? xml.urlset.url
-      : [xml.urlset.url]
-    : [];
-  const locs = list.map((u: any) => ({ loc: u.loc, lastmod: u.lastmod }));
+  const now = new Date();
+  const sitemapUpdate: Partial<typeof sitemaps.$inferInsert> = {
+    lastStatus: res.status,
+    updatedAt: now,
+  };
+  const headerEtag = res.headers.get("etag");
+  if (headerEtag !== null) sitemapUpdate.lastEtag = headerEtag;
+  const headerLastModified = res.headers.get("last-modified");
+  if (headerLastModified !== null) sitemapUpdate.lastModified = headerLastModified;
+
+  if (res.status === 304) {
+    await db.update(sitemaps).set(sitemapUpdate).where(eq(sitemaps.id, sm.id));
+    return { changed: false, urlsAdded: 0, urlsRemoved: 0, urlCount: 0 };
+  }
+  if (!res.ok) {
+    await db.update(sitemaps).set(sitemapUpdate).where(eq(sitemaps.id, sm.id));
+    throw new Error(`fetch failed with status ${res.status}`);
+  }
+
+  let xml: unknown;
+  try {
+    xml = xmlParser.parse(await res.text());
+  } catch (err) {
+    await db.update(sitemaps).set(sitemapUpdate).where(eq(sitemaps.id, sm.id));
+    throw err instanceof Error ? err : new Error(String(err));
+  }
+
+  const list: ParsedSitemapUrl[] = extractUrlNodes(xml)
+    .map((raw) => parseSitemapUrl(raw))
+    .filter((node): node is ParsedSitemapUrl => Boolean(node));
+
+  const locMap = new Map<
+    string,
+    {
+      loc: string;
+      lastmod: string | null;
+      changefreq: string | null;
+      priority: string | null;
+    }
+  >();
+
+  for (const raw of list) {
+    const loc = raw.loc.trim();
+    if (!loc) continue;
+    locMap.set(loc, {
+      loc,
+      lastmod: raw.lastmod ?? null,
+      changefreq: raw.changefreq ?? null,
+      priority: raw.priority ?? null,
+    });
+  }
 
   const existing = await db
     .select()
     .from(urls)
     .where(eq(urls.sitemapId, sm.id));
-  const existingSet = new Set(existing.map((e) => e.loc));
-  const newSet = new Set(locs.map((l) => l.loc));
+  const existingMap = new Map(existing.map((row) => [row.loc, row]));
 
-  const toAdd = [...newSet].filter((x) => !existingSet.has(x));
-  const toRemove = [...existingSet].filter((x) => !newSet.has(x));
+  const toAdd: Array<{
+    loc: string;
+    lastmod: string | null;
+    changefreq: string | null;
+    priority: string | null;
+  }> = [];
+  const toKeep: Array<{
+    record: (typeof existing)[number];
+    detail: {
+      loc: string;
+      lastmod: string | null;
+      changefreq: string | null;
+      priority: string | null;
+    };
+  }> = [];
+  for (const [loc, detail] of locMap) {
+    const record = existingMap.get(loc);
+    if (record) {
+      toKeep.push({ record, detail });
+    } else {
+      toAdd.push(detail);
+    }
+  }
 
-  for (const loc of toAdd) {
+  const toRemove = existing.filter((row) => !locMap.has(row.loc));
+
+  for (const { record, detail } of toKeep) {
+    await db
+      .update(urls)
+      .set({
+        lastSeenAt: now,
+        lastmod: detail.lastmod ?? record.lastmod ?? null,
+        changefreq: detail.changefreq ?? record.changefreq ?? null,
+        priority: detail.priority ?? record.priority ?? null,
+        status: "active",
+      })
+      .where(eq(urls.id, record.id));
+  }
+
+  for (const detail of toAdd) {
+    const urlId = randomUUID();
     await db
       .insert(urls)
       .values({
-        id: randomUUID(),
+        id: urlId,
         siteId,
         sitemapId: sm.id,
-        loc,
-        firstSeenAt: new Date(),
-        lastSeenAt: new Date(),
+        loc: detail.loc,
+        lastmod: detail.lastmod,
+        changefreq: detail.changefreq,
+        priority: detail.priority,
+        firstSeenAt: now,
+        lastSeenAt: now,
+        status: "active",
       });
     await db
       .insert(changes)
-      .values({ id: randomUUID(), siteId, type: "added", detail: loc });
-  }
-  for (const loc of toRemove) {
-    await db
-      .insert(changes)
-      .values({ id: randomUUID(), siteId, type: "removed", detail: loc });
+      .values({
+        id: randomUUID(),
+        siteId,
+        urlId,
+        type: "added",
+        detail: detail.loc,
+      });
   }
 
-  await db
-    .update(sitemaps)
-    .set({
-      lastEtag: res.headers.get("etag") ?? null,
-      lastModified: res.headers.get("last-modified") ?? null,
-      lastStatus: res.status,
-      updatedAt: new Date(),
-    })
-    .where(eq(sitemaps.id, sm.id));
+  for (const row of toRemove) {
+    await db
+      .update(urls)
+      .set({ status: "inactive", lastSeenAt: now })
+      .where(eq(urls.id, row.id));
+    await db
+      .insert(changes)
+      .values({
+        id: randomUUID(),
+        siteId,
+        urlId: row.id,
+        type: "removed",
+        detail: row.loc,
+      });
+  }
+
+  await db.update(sitemaps).set(sitemapUpdate).where(eq(sitemaps.id, sm.id));
 
   return {
     changed: true,
     urlsAdded: toAdd.length,
     urlsRemoved: toRemove.length,
-    urlCount: locs.length,
+    urlCount: locMap.size,
   };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function parseSitemapUrl(value: unknown): ParsedSitemapUrl | undefined {
+  if (!isRecord(value)) return undefined;
+  const loc = typeof value.loc === "string" ? value.loc : "";
+  if (!loc) return undefined;
+  return {
+    loc,
+    lastmod: typeof value.lastmod === "string" ? value.lastmod : undefined,
+    changefreq: typeof value.changefreq === "string" ? value.changefreq : undefined,
+    priority: typeof value.priority === "string" ? value.priority : undefined,
+  };
+}
+
+function extractUrlNodes(source: unknown): unknown[] {
+  if (!isRecord(source)) return [];
+  const urlset = source.urlset;
+  if (!urlset) return [];
+
+  if (Array.isArray(urlset)) return urlset;
+
+  if (isRecord(urlset)) {
+    const urls = urlset.url;
+    if (Array.isArray(urls)) return urls;
+    if (urls !== undefined) return [urls];
+  }
+
+  return [];
 }

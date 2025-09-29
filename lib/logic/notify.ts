@@ -1,5 +1,15 @@
 import crypto from "crypto";
-export async function notifyChange(siteId: string, payload: any) {
+
+export type ChangePayload = {
+  scanId: string;
+  added: number;
+  removed: number;
+  updated?: number;
+  type?: string;
+  [key: string]: unknown;
+};
+
+export async function notifyChange(siteId: string, payload: ChangePayload) {
   const body = JSON.stringify({
     type: "sitemap.change",
     siteId,

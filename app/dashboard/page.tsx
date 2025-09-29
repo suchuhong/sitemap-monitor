@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { db } from "@/lib/db";
 import { sites, changes, scans } from "@/lib/drizzle/schema";
@@ -125,9 +126,9 @@ export default async function Page() {
         <CardContent>
           <p className="text-sm text-slate-600">
             前往{" "}
-            <a className="underline" href="/sites/new">
+            <Link className="underline" href="/sites/new">
               新增站点
-            </a>
+            </Link>
             ，输入根地址进行识别。
           </p>
         </CardContent>

@@ -1,0 +1,117 @@
+"use client";
+import { useMemo } from "react";
+
+export type ScanPoint = {
+  startedAt: number;
+  totalUrls: number;
+  added: number;
+  removed: number;
+};
+
+export function ScanTrendChart({ points }: { points: ScanPoint[] }) {
+  const { path, area, maxY, labels } = useMemo(() => {
+    if (!points.length) return { path: "", area: "", maxY: 0, labels: [] as string[] };
+
+    const sorted = [...points].sort((a, b) => a.startedAt - b.startedAt);
+    const totals = sorted.map((p) => Math.max(0, p.totalUrls));
+    const maxVal = Math.max(...totals, 1);
+
+    const width = 640;
+    const height = 180;
+    const padding = 32;
+    const chartWidth = width - padding * 2;
+    const chartHeight = height - padding * 2;
+
+    const projectX = (index: number) =>
+      sorted.length === 1 ? padding + chartWidth / 2 : padding + (chartWidth * index) / (sorted.length - 1);
+    const projectY = (value: number) => padding + chartHeight - (chartHeight * value) / maxVal;
+
+    const pathD = sorted
+      .map((point, idx) => `${idx === 0 ? "M" : "L"}${projectX(idx)},${projectY(point.totalUrls)}`)
+      .join(" ");
+
+    const areaD = sorted.length > 1
+      ? `${sorted
+          .map((point, idx) => `${idx === 0 ? "M" : "L"}${projectX(idx)},${projectY(point.totalUrls)}`)
+          .join(" ")} L${projectX(sorted.length - 1)},${height - padding} L${projectX(0)},${height - padding} Z`
+      : "";
+
+    const monthFmt = new Intl.DateTimeFormat(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    const labelList = sorted.map((p) => monthFmt.format(new Date(p.startedAt)));
+
+    return { path: pathD, area: areaD, maxY: maxVal, labels: labelList };
+  }, [points]);
+
+  if (!points.length) {
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900">
+        暂无扫描数据，执行一次手动扫描后即可查看趋势。
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950/40">
+      <div className="flex items-baseline justify-between">
+        <div>
+          <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">扫描数量趋势</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            最近 {points.length} 次扫描的 URL 总量变化
+          </p>
+        </div>
+        <div className="text-xs text-slate-500 dark:text-slate-400">
+          最大 URL：{maxY}
+        </div>
+      </div>
+
+      <svg viewBox="0 0 640 200" className="w-full">
+        <defs>
+          <linearGradient id="scanArea" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="rgba(37, 99, 235, 0.25)" />
+            <stop offset="100%" stopColor="rgba(37, 99, 235, 0)" />
+          </linearGradient>
+          <linearGradient id="scanStroke" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0%" stopColor="#2563eb" />
+            <stop offset="100%" stopColor="#0ea5e9" />
+          </linearGradient>
+          <pattern id="gridPattern" width="32" height="32" patternUnits="userSpaceOnUse">
+            <path d="M32 32H0V0" fill="none" stroke="rgba(148, 163, 184, 0.15)" strokeWidth="1" />
+          </pattern>
+        </defs>
+        <g>
+          <rect x="32" y="32" width="576" height="136" fill="url(#gridPattern)" />
+          {area && <path d={area} fill="url(#scanArea)" />}
+          {path && (
+            <path
+              d={path}
+              fill="none"
+              stroke="url(#scanStroke)"
+              strokeWidth="3"
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+          )}
+        </g>
+      </svg>
+
+      <div className="grid gap-2 text-xs text-slate-500 dark:text-slate-400 sm:grid-cols-2 md:grid-cols-3">
+        {points.map((point, idx) => (
+          <div key={point.startedAt} className="rounded-lg border border-slate-100 bg-slate-50 p-2 dark:border-slate-800 dark:bg-slate-900/40">
+            <div className="font-medium text-slate-700 dark:text-slate-200">{labels[idx]}</div>
+            <div className="mt-1 flex gap-3 text-xs">
+              <span>URL：{point.totalUrls}</span>
+              <span className="text-emerald-600">+{point.added}</span>
+              <span className="text-rose-500">-{point.removed}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

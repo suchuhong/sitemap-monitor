@@ -1,369 +1,288 @@
-import { db } from "@/lib/db";
-import { sites, sitemaps, scans, changes } from "@/lib/drizzle/schema";
-import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+} from "@/components/ui/card";
+import { Badge, type BadgeProps } from "@/components/ui/badge";
+import { getSiteDetail } from "@/lib/logic/site-detail";
+import { SiteActionsPanel } from "./_components/site-actions";
 import { ConfirmScan } from "./_components/ConfirmScan";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ScanTrendChart, type ScanPoint } from "./_components/scan-trend-chart";
 
-type ChangeType = "added" | "removed" | "updated";
+export const dynamic = "force-dynamic";
 
-function firstParam(
-  params: Record<string, string | string[]> | undefined,
-  key: string,
-): string | undefined {
-  const value = params?.[key];
-  if (!value) return undefined;
-  return Array.isArray(value) ? value[0] : value;
-}
+const DEMO_OWNER_ID = "demo-user";
 
-function parsePositiveInt(value: string | undefined, fallback: number): number {
-  const parsed = Number.parseInt(value ?? "", 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-}
-
-function parseDateToUnixSeconds(value: string | undefined): number | undefined {
-  if (!value) return undefined;
-  const ts = Number.isNaN(Date.parse(value))
-    ? NaN
-    : Math.floor(new Date(value).getTime() / 1000);
-  return Number.isFinite(ts) ? ts : undefined;
-}
-
-function formatTimestamp(value: unknown): string {
-  if (!value) return "—";
-  const date =
-    value instanceof Date
-      ? value
-      : typeof value === "number"
-        ? new Date(value > 1e12 ? value : value * 1000)
-        : new Date(String(value));
-  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString();
-}
-
-export default async function SiteDetail({
+export default async function SiteDetailPage({
   params,
-  searchParams,
 }: {
-  params: { id: string };
-  searchParams?: Record<string, string | string[]>;
+  params: Promise<{ id: string }>;
 }) {
-  const siteId = params.id;
-  const site = await db.query.sites.findFirst({ where: eq(sites.id, siteId) });
-  if (!site) return <div className="text-sm text-rose-600">站点不存在</div>;
+  const { id } = await params;
+  const detail = await getSiteDetail({ siteId: id, ownerId: DEMO_OWNER_ID, scansLimit: 20 });
+  if (!detail) notFound();
 
-  const sitemapList = await db
-    .select()
-    .from(sitemaps)
-    .where(eq(sitemaps.siteId, siteId));
-  const lastScan = await db.query.scans.findFirst({
-    where: eq(scans.siteId, siteId),
-    orderBy: [desc(scans.startedAt)],
-  });
-
-  const type = firstParam(searchParams, "type") as ChangeType | undefined;
-  const fromTs = parseDateToUnixSeconds(firstParam(searchParams, "from"));
-  const toTs = parseDateToUnixSeconds(firstParam(searchParams, "to"));
-  const currentPage = parsePositiveInt(firstParam(searchParams, "cpage"), 1);
-  const pageSize = Math.min(
-    parsePositiveInt(firstParam(searchParams, "csize"), 20),
-    200,
-  );
-  const offset = (currentPage - 1) * pageSize;
-
-  const changeFilters = [eq(changes.siteId, siteId)] as any[];
-  if (type) changeFilters.push(eq(changes.type, type));
-  if (fromTs) changeFilters.push(gte(changes.occurredAt, fromTs));
-  if (toTs) changeFilters.push(lte(changes.occurredAt, toTs));
-
-  let changeWhere = changeFilters[0];
-  for (const condition of changeFilters.slice(1))
-    changeWhere = and(changeWhere, condition);
-
-  const [{ totalChanges = 0 } = {}] = await db
-    .select({ totalChanges: sql<number>`count(*)` })
-    .from(changes)
-    .where(changeWhere);
-
-  const changeRows = await db
-    .select({
-      id: changes.id,
-      type: changes.type,
-      detail: changes.detail,
-      occurredAt: changes.occurredAt,
-    })
-    .from(changes)
-    .where(changeWhere)
-    .orderBy(desc(changes.occurredAt))
-    .limit(pageSize)
-    .offset(offset);
-
-  const totalPages = Math.max(1, Math.ceil(totalChanges / pageSize));
-  const activeTab = firstParam(searchParams, "tab") ?? "sitemaps";
+  const { site, sitemaps, summary, recentScans, recentChanges } = detail;
+  const scanTrendPoints: ScanPoint[] = recentScans
+    .filter((scan) => scan?.startedAt)
+    .map((scan) => ({
+      startedAt: normalizeToMillis(scan.startedAt),
+      totalUrls: Number(scan.totalUrls ?? 0),
+      added: Number(scan.added ?? 0),
+      removed: Number(scan.removed ?? 0),
+    }))
+    .filter((p) => Number.isFinite(p.startedAt));
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-xl font-semibold">{site.rootUrl}</h1>
-          <p className="text-sm text-slate-600">
-            robots: {site.robotsUrl ?? "未发现"}
-          </p>
+      <div className="flex items-center justify-between">
+        <Link href="/sites" className="text-sm text-slate-600 hover:underline">
+          ← 返回列表
+        </Link>
+        <div className="text-xs text-slate-500">
+          最近更新：{formatDate(site.updatedAt)}
         </div>
-        <ConfirmScan siteId={siteId} />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2">
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">
-              Sitemap 数量
-            </CardTitle>
+          <CardHeader>
+            <CardTitle>基础信息</CardTitle>
           </CardHeader>
-          <CardContent className="text-3xl font-semibold">
-            {sitemapList.length}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">
-              最近扫描
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-3xl font-semibold">
-            {formatTimestamp(lastScan?.startedAt)}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">
-              最近变化
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-3xl font-semibold">
-            {changeRows.length}
-          </CardContent>
-        </Card>
-      </div>
-
-      <Tabs defaultValue={activeTab}>
-        <TabsList>
-          <TabsTrigger value="sitemaps">Sitemaps</TabsTrigger>
-          <TabsTrigger value="changes">Changes</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="sitemaps">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Sitemaps</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2 text-sm">
-                {sitemapList.map((sitemap) => (
-                  <div
-                    key={sitemap.id}
-                    className="flex items-center gap-3 border-b py-2 last:border-none"
-                  >
-                    <a
-                      className="truncate underline"
-                      href={sitemap.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {sitemap.url}
-                    </a>
-                    {sitemap.isIndex ? (
-                      <Badge>index</Badge>
-                    ) : (
-                      <Badge variant="outline">file</Badge>
-                    )}
-                    <span className="text-slate-500">
-                      status: {sitemap.lastStatus ?? "-"}
-                    </span>
-                    <span className="text-slate-500">
-                      etag: {sitemap.lastEtag ?? "-"}
-                    </span>
-                    <span className="text-slate-500">
-                      last-modified: {sitemap.lastModified ?? "-"}
-                    </span>
-                  </div>
-                ))}
-                {sitemapList.length === 0 && (
-                  <div className="text-slate-500">
-                    暂无 sitemap，等待识别或检查 robots.txt。
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="changes">
-          <Card>
-            <CardHeader className="flex items-center justify-between pb-2">
-              <CardTitle className="text-base">最近变更</CardTitle>
-              <form
-                className="flex flex-wrap items-end gap-2 text-sm"
-                method="get"
-              >
-                <div>
-                  <label className="block text-xs text-slate-500">类型</label>
-                  <select
-                    name="type"
-                    defaultValue={type ?? ""}
-                    className="h-8 rounded-md border px-2"
-                  >
-                    <option value="">全部</option>
-                    <option value="added">added</option>
-                    <option value="removed">removed</option>
-                    <option value="updated">updated</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-500">起始</label>
-                  <input
-                    type="date"
-                    name="from"
-                    defaultValue={firstParam(searchParams, "from") ?? ""}
-                    className="h-8 rounded-md border px-2"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-500">结束</label>
-                  <input
-                    type="date"
-                    name="to"
-                    defaultValue={firstParam(searchParams, "to") ?? ""}
-                    className="h-8 rounded-md border px-2"
-                  />
-                </div>
-                <input type="hidden" name="tab" value="changes" />
-                <input type="hidden" name="csize" value={String(pageSize)} />
-                <button className="h-8 rounded-md border px-3" type="submit">
-                  筛选
-                </button>
-                <a
-                  className="h-8 rounded-md border px-3"
-                  href={`/api/sites/${siteId}/changes.csv?type=${type ?? ""}&from=${firstParam(searchParams, "from") ?? ""}&to=${firstParam(searchParams, "to") ?? ""}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  导出 CSV
+          <CardContent className="space-y-2 text-sm">
+            <div>
+              <span className="text-slate-500">Root URL：</span>
+              <a href={site.rootUrl} target="_blank" rel="noreferrer" className="underline">
+                {site.rootUrl}
+              </a>
+            </div>
+            <div>
+              <span className="text-slate-500">robots.txt：</span>
+              {site.robotsUrl ? (
+                <a href={site.robotsUrl} target="_blank" rel="noreferrer" className="underline">
+                  {site.robotsUrl}
                 </a>
-              </form>
-            </CardHeader>
-            <CardContent>
-              <ol className="space-y-2 text-sm">
-                {changeRows.map((change) => (
-                  <li key={change.id} className="flex items-start gap-2">
-                    {change.type === "added" && (
-                      <Badge variant="added">added</Badge>
-                    )}
-                    {change.type === "removed" && (
-                      <Badge variant="removed">removed</Badge>
-                    )}
-                    {change.type === "updated" && (
-                      <Badge variant="updated">updated</Badge>
-                    )}
-                    <span className="truncate">{change.detail}</span>
-                    <span className="ml-auto text-xs text-slate-500">
-                      {formatTimestamp(change.occurredAt)}
+              ) : (
+                "—"
+              )}
+            </div>
+            <div>
+              <span className="text-slate-500">创建时间：</span>
+              {formatDate(site.createdAt)}
+            </div>
+            <div>
+              <span className="text-slate-500">状态：</span>
+              <Badge variant={site.enabled ? "added" : "removed"}>
+                {site.enabled ? "已启用" : "已禁用"}
+              </Badge>
+            </div>
+            <div>
+              <span className="text-slate-500">标签：</span>
+              {Array.isArray(site.tags) && site.tags.length ? (
+                <span className="inline-flex flex-wrap gap-2">
+                  {site.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-600 dark:bg-blue-900/40 dark:text-blue-200"
+                    >
+                      {tag}
                     </span>
-                  </li>
-                ))}
-                {changeRows.length === 0 && (
-                  <div className="text-slate-500">暂无变更记录。</div>
-                )}
-              </ol>
-              <div className="mt-4 flex items-center justify-between text-sm">
-                <div className="text-slate-600">
-                  共 {totalChanges} 条，{currentPage}/{totalPages} 页
-                </div>
-                <div className="flex items-center gap-2">
-                  <a
-                    className={`h-8 rounded-md border px-3 ${currentPage <= 1 ? "pointer-events-none opacity-50" : ""}`}
-                    href={`?tab=changes&type=${type ?? ""}&from=${firstParam(searchParams, "from") ?? ""}&to=${firstParam(searchParams, "to") ?? ""}&cpage=${currentPage - 1}&csize=${pageSize}`}
-                  >
-                    上一页
-                  </a>
-                  <a
-                    className={`h-8 rounded-md border px-3 ${currentPage >= totalPages ? "pointer-events-none opacity-50" : ""}`}
-                    href={`?tab=changes&type=${type ?? ""}&from=${firstParam(searchParams, "from") ?? ""}&to=${firstParam(searchParams, "to") ?? ""}&cpage=${currentPage + 1}&csize=${pageSize}`}
-                  >
-                    下一页
-                  </a>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                  ))}
+                </span>
+              ) : (
+                <span className="text-slate-400">未设置</span>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
-        <TabsContent value="settings">
-          <Settings siteId={siteId} />
-        </TabsContent>
-      </Tabs>
+        <Card>
+          <CardHeader>
+            <CardTitle>URL 概览</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div>
+                <div className="text-lg font-semibold">{summary.totalUrls}</div>
+                <div className="text-xs text-slate-500">总数</div>
+              </div>
+              <div>
+                <div className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">
+                  {summary.activeUrls}
+                </div>
+                <div className="text-xs text-slate-500">活跃</div>
+              </div>
+              <div>
+                <div className="text-lg font-semibold text-amber-600 dark:text-amber-400">
+                  {summary.inactiveUrls}
+                </div>
+                <div className="text-xs text-slate-500">已失效</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <SiteActionsPanel
+        siteId={site.id}
+        initialRootUrl={site.rootUrl}
+        initialEnabled={Boolean(site.enabled)}
+        initialTags={Array.isArray(site.tags) ? site.tags : []}
+      />
+
+      <ScanTrendChart points={scanTrendPoints} />
+
+      <Card className="rounded-2xl border border-slate-200 bg-slate-50 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+        <CardHeader>
+          <CardTitle>手动扫描</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm text-slate-600 dark:text-slate-300">
+          <p>
+            立即触发一次 sitemap 扫描，用于验证配置或在重要变更发生时立刻同步数据。
+          </p>
+          <ConfirmScan siteId={site.id} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Sitemap 列表</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-left text-xs uppercase text-slate-500">
+                <tr>
+                  <th className="px-2 py-2">URL</th>
+                  <th className="px-2 py-2">类型</th>
+                  <th className="px-2 py-2">URL 数量</th>
+                  <th className="px-2 py-2">最后状态</th>
+                  <th className="px-2 py-2">更新时间</th>
+                </tr>
+              </thead>
+              <tbody className="[&_tr:last-child]:border-0">
+                {sitemaps.map((item) => (
+                  <tr key={item.id} className="border-b">
+                    <td className="px-2 py-2">
+                      <a href={item.url} target="_blank" rel="noreferrer" className="underline">
+                        {item.url}
+                      </a>
+                    </td>
+                    <td className="px-2 py-2">
+                      {item.isIndex ? <Badge variant="outline">Index</Badge> : "URL 集"}
+                    </td>
+                    <td className="px-2 py-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span>总计 {item.urlCounts.total}</span>
+                        <span className="text-emerald-600 dark:text-emerald-400">
+                          活跃 {item.urlCounts.active}
+                        </span>
+                        <span className="text-amber-600 dark:text-amber-400">
+                          失效 {item.urlCounts.inactive}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-2 py-2">{item.lastStatus ?? "—"}</td>
+                    <td className="px-2 py-2">{formatDate(item.updatedAt)}</td>
+                  </tr>
+                ))}
+                {sitemaps.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-6 text-center text-slate-500">
+                      暂未发现 sitemap
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>最近扫描</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            {recentScans.length === 0 && <div className="text-slate-500">暂无扫描记录</div>}
+            {recentScans.map((scan) => (
+              <div key={scan.id} className="rounded-xl border p-3">
+                <div className="flex items-center justify-between">
+                  <div className="font-medium">{formatDate(scan.startedAt)}</div>
+                  <Badge variant={statusBadgeVariant(scan.status ?? "unknown")}>{scan.status ?? "unknown"}</Badge>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-500">
+                  <span>URL：{scan.totalUrls}</span>
+                  <span>新增：{scan.added}</span>
+                  <span>移除：{scan.removed}</span>
+                </div>
+                <div className="mt-2 text-xs text-slate-500">
+                  {scan.finishedAt ? `完成于 ${formatDate(scan.finishedAt)}` : "进行中"}
+                </div>
+                {scan.error && (
+                  <div className="mt-2 text-xs text-rose-500">{scan.error}</div>
+                )}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>最近变更</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            {recentChanges.length === 0 && <div className="text-slate-500">暂无变更</div>}
+            {recentChanges.map((change) => (
+              <div key={change.id} className="rounded-xl border p-3">
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <span>{formatDate(change.occurredAt)}</span>
+                  <Badge variant={changeBadgeVariant(change.type)}>{change.type}</Badge>
+                </div>
+                <div className="mt-2 break-words text-sm">{change.detail ?? "—"}</div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
 
-function Settings({ siteId }: { siteId: string }) {
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base">设置</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <WebhookForm siteId={siteId} />
-      </CardContent>
-    </Card>
-  );
+function formatDate(value: unknown) {
+  const date = coerceDate(value);
+  return date ? date.toLocaleString() : "—";
 }
 
-function WebhookForm({ siteId }: { siteId: string }) {
-  return (
-    <form
-      action={`/api/sites/${siteId}/webhooks`}
-      method="post"
-      className="max-w-xl space-y-3"
-    >
-      <div>
-        <label className="block text-sm font-medium">Webhook 目标 URL</label>
-        <input
-          name="targetUrl"
-          type="url"
-          required
-          placeholder="https://your-endpoint.example.com"
-          className="mt-1 h-9 w-full rounded-md border px-3 text-sm"
-        />
-      </div>
-      <div>
-        <label className="block text-sm font-medium">
-          Secret（用于 HMAC 签名）
-        </label>
-        <input
-          name="secret"
-          type="text"
-          placeholder="可留空"
-          className="mt-1 h-9 w-full rounded-md border px-3 text-sm"
-        />
-      </div>
-      <button
-        className="inline-flex h-9 items-center rounded-md bg-brand px-4 text-sm font-medium text-white"
-        type="submit"
-      >
-        保存
-      </button>
-      <div className="pt-2">
-        <button
-          formAction={`/api/sites/${siteId}/test-webhook`}
-          formMethod="post"
-          className="inline-flex h-9 items-center rounded-md border px-4 text-sm"
-          type="submit"
-        >
-          发送测试 Webhook
-        </button>
-      </div>
-    </form>
-  );
+function coerceDate(value: unknown) {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  const num = Number(value);
+  if (!Number.isFinite(num)) return null;
+  const millis = num > 1e12 ? num : num * 1000;
+  return new Date(millis);
+}
+
+function normalizeToMillis(value: unknown) {
+  if (!value) return NaN;
+  if (value instanceof Date) return value.getTime();
+  const num = Number(value);
+  if (!Number.isFinite(num)) return NaN;
+  return num > 1e12 ? num : num * 1000;
+}
+
+function statusBadgeVariant(status: string): BadgeProps["variant"] {
+  if (status === "success") return "added";
+  if (status === "failed") return "removed";
+  return "default";
+}
+
+function changeBadgeVariant(type: string): BadgeProps["variant"] {
+  if (type === "added") return "added";
+  if (type === "removed") return "removed";
+  return "updated";
 }

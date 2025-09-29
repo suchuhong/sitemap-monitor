@@ -1,4 +1,6 @@
 import type { Config } from "tailwindcss";
+import forms from "@tailwindcss/forms";
+import typography from "@tailwindcss/typography";
 
 export default {
   darkMode: ["class"],
@@ -11,5 +13,5 @@ export default {
       boxShadow: { card: "0 6px 30px rgba(0,0,0,0.06)" },
     },
   },
-  plugins: [require("@tailwindcss/typography"), require("@tailwindcss/forms")],
+  plugins: [typography, forms],
 } satisfies Config;
