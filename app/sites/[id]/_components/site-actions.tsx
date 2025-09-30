@@ -10,6 +10,9 @@ type SiteDetailResponse = {
   site?: {
     rootUrl?: string;
     enabled?: boolean;
+    scanPriority?: number;
+    scanIntervalMinutes?: number;
+    tags?: string[];
   };
 };
 
@@ -18,20 +21,28 @@ export function SiteActionsPanel({
   initialRootUrl,
   initialEnabled,
   initialTags,
+  initialPriority,
+  initialInterval,
 }: {
   siteId: string;
   initialRootUrl: string;
   initialEnabled: boolean;
   initialTags: string[];
+  initialPriority: number;
+  initialInterval: number;
 }) {
   const router = useRouter();
   const initialNormalized = normalizeTagsList(initialTags);
   const [baselineRoot, setBaselineRoot] = useState(initialRootUrl);
   const [baselineEnabled, setBaselineEnabled] = useState(initialEnabled);
   const [baselineTags, setBaselineTags] = useState(initialNormalized);
+  const [baselinePriority, setBaselinePriority] = useState(initialPriority);
+  const [baselineInterval, setBaselineInterval] = useState(initialInterval);
   const [rootUrl, setRootUrl] = useState(initialRootUrl);
   const [enabled, setEnabled] = useState(initialEnabled);
   const [tags, setTags] = useState(initialNormalized);
+  const [scanPriority, setScanPriority] = useState(initialPriority);
+  const [scanInterval, setScanInterval] = useState(initialInterval);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -41,8 +52,25 @@ export function SiteActionsPanel({
     const tagsChanged =
       normalizedTags.length !== normalizedBaseline.length ||
       normalizedTags.some((tag, idx) => tag !== normalizedBaseline[idx]);
-    return rootUrl.trim() !== baselineRoot || enabled !== baselineEnabled || tagsChanged;
-  }, [rootUrl, baselineRoot, enabled, baselineEnabled, tags, baselineTags]);
+    return (
+      rootUrl.trim() !== baselineRoot ||
+      enabled !== baselineEnabled ||
+      tagsChanged ||
+      scanPriority !== baselinePriority ||
+      scanInterval !== baselineInterval
+    );
+  }, [
+    rootUrl,
+    baselineRoot,
+    enabled,
+    baselineEnabled,
+    tags,
+    baselineTags,
+    scanPriority,
+    baselinePriority,
+    scanInterval,
+    baselineInterval,
+  ]);
 
   const handleSave = async () => {
     const payload: Record<string, unknown> = {};
@@ -56,6 +84,8 @@ export function SiteActionsPanel({
       normalizedTags.some((tag, idx) => tag !== normalizedBaseline[idx])
     )
       payload.tags = normalizedTags;
+    if (scanPriority !== baselinePriority) payload.scanPriority = scanPriority;
+    if (scanInterval !== baselineInterval) payload.scanIntervalMinutes = scanInterval;
     if (Object.keys(payload).length === 0) {
       toast.info("没有需要保存的变化");
       return;
@@ -85,6 +115,14 @@ export function SiteActionsPanel({
         const normalized = normalizeTagsList(detail.site.tags);
         setTags(normalized);
         setBaselineTags(normalized);
+      }
+      if (typeof detail?.site?.scanPriority === "number") {
+        setScanPriority(detail.site.scanPriority);
+        setBaselinePriority(detail.site.scanPriority);
+      }
+      if (typeof detail?.site?.scanIntervalMinutes === "number") {
+        setScanInterval(detail.site.scanIntervalMinutes);
+        setBaselineInterval(detail.site.scanIntervalMinutes);
       }
       toast.success("保存成功");
       router.refresh();
@@ -138,6 +176,31 @@ export function SiteActionsPanel({
           />
           <span>启用监控</span>
         </label>
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="space-y-2 text-sm">
+            <label className="block text-slate-500">扫描优先级 (1-5)</label>
+            <Input
+              type="number"
+              min={1}
+              max={5}
+              value={scanPriority}
+              onChange={(event) => setScanPriority(clamp(parseInt(event.target.value, 10), 1, 5))}
+            />
+            <p className="text-xs text-slate-400">数值越高越优先扫描。</p>
+          </div>
+          <div className="space-y-2 text-sm">
+            <label className="block text-slate-500">扫描间隔（分钟）</label>
+            <Input
+              type="number"
+              min={5}
+              value={scanInterval}
+              onChange={(event) =>
+                setScanInterval(clamp(parseInt(event.target.value, 10), 5, 10080))
+              }
+            />
+            <p className="text-xs text-slate-400">推荐 15 ~ 1440 分钟，可按站点重要性调整。</p>
+          </div>
+        </div>
         <div className="flex gap-2">
           <Button onClick={handleSave} disabled={saving || !dirty}>
             {saving ? "保存中..." : "保存"}
@@ -149,6 +212,8 @@ export function SiteActionsPanel({
               setRootUrl(baselineRoot);
               setEnabled(baselineEnabled);
               setTags(baselineTags);
+              setScanPriority(baselinePriority);
+              setScanInterval(baselineInterval);
             }}
             disabled={saving || (!dirty && !saving)}
           >
@@ -191,4 +256,9 @@ function normalizeTagsList(tags: string[]) {
   return Array.from(new Set(tags.map((tag) => tag.trim()).filter(Boolean))).sort((a, b) =>
     a.localeCompare(b),
   );
+}
+
+function clamp(value: number, min: number, max: number) {
+  if (Number.isNaN(value)) return min;
+  return Math.max(min, Math.min(max, value));
 }

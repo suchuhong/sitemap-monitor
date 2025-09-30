@@ -49,9 +49,12 @@ export async function getCurrentUser(): Promise<UserRecord | null> {
   return user ?? null;
 }
 
-export async function requireUser(): Promise<UserRecord> {
+export async function requireUser(options?: { redirectTo?: string }): Promise<UserRecord> {
   const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  if (!user) {
+    const target = sanitizeRedirect(options?.redirectTo) ?? "/dashboard";
+    redirect(`/login?redirect=${encodeURIComponent(target)}`);
+  }
   return user;
 }
 
@@ -66,4 +69,11 @@ async function createUser(email: string): Promise<UserRecord> {
   const user = { id: randomUUID(), email, createdAt: new Date() };
   await db.insert(users).values(user);
   return user;
+}
+
+function sanitizeRedirect(value?: string | null) {
+  if (!value) return null;
+  if (!value.startsWith("/")) return null;
+  if (value.startsWith("//")) return null;
+  return value;
 }

@@ -1,17 +1,19 @@
 'use client';
 
-import { useFormState, useFormStatus } from "react-dom";
+import { useActionState } from "react";
+import { useFormStatus } from "react-dom";
 import { signInAction } from "@/app/(actions)/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 const initialState = { error: "" } as const;
 
-export function LoginForm() {
-  const [state, formAction] = useFormState(signInAction, initialState);
+export function LoginForm({ redirectTo }: { redirectTo: string }) {
+  const [state, formAction] = useActionState(signInAction, initialState);
 
   return (
     <form action={formAction} className="space-y-4">
+      <input type="hidden" name="redirect" value={redirectTo} />
       <div className="space-y-2">
         <label htmlFor="email" className="block text-sm font-medium text-slate-700 dark:text-slate-200">
           邮箱地址

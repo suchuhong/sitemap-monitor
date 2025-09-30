@@ -2,9 +2,17 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
 import { LoginForm } from "./sign-in-form";
 
-export default async function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[]>>;
+}) {
+  const params = (searchParams ? await searchParams : {}) ?? {};
+  const rawRedirect = Array.isArray(params.redirect) ? params.redirect[0] : params.redirect;
+  const redirectTo = sanitizeRedirect(rawRedirect) ?? "/dashboard";
+
   const user = await getCurrentUser();
-  if (user) redirect("/dashboard");
+  if (user) redirect(redirectTo);
 
   return (
     <div className="flex min-h-[60vh] items-center justify-center">
@@ -15,8 +23,15 @@ export default async function LoginPage() {
             输入企业邮箱即可开始使用，系统会自动为您创建私有空间。
           </p>
         </div>
-        <LoginForm />
+        <LoginForm redirectTo={redirectTo} />
       </div>
     </div>
   );
+}
+
+function sanitizeRedirect(value?: string | null) {
+  if (!value) return null;
+  if (!value.startsWith("/")) return null;
+  if (value.startsWith("//")) return null;
+  return value;
 }

@@ -6,6 +6,7 @@ export type ScanPoint = {
   totalUrls: number;
   added: number;
   removed: number;
+  updated: number;
 };
 
 export function ScanTrendChart({ points }: { points: ScanPoint[] }) {
@@ -108,6 +109,7 @@ export function ScanTrendChart({ points }: { points: ScanPoint[] }) {
               <span>URL：{point.totalUrls}</span>
               <span className="text-emerald-600">+{point.added}</span>
               <span className="text-rose-500">-{point.removed}</span>
+              <span className="text-amber-500">Δ{point.updated}</span>
             </div>
           </div>
         ))}

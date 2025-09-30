@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { StatusIndicator } from "@/components/ui/status-indicator";
 import { EmptyState } from "@/components/ui/empty-state";
-import { formatDate, formatTime } from "@/lib/datetime";
+import { formatDate, formatDateTime, formatTime } from "@/lib/datetime";
 
 export type SitesTableRow = {
   id: string;
@@ -10,6 +10,9 @@ export type SitesTableRow = {
   createdAt: number | null;
   enabled: boolean | null;
   tags?: string | null;
+  scanPriority?: number | null;
+  scanIntervalMinutes?: number | null;
+  lastScanAt?: Date | number | null;
 };
 
 export function SitesTableSSR({
@@ -70,6 +73,14 @@ export function SitesTableSSR({
                     </svg>
                     创建时间 {sortIcon("createdAt")}
                   </a>
+                </th>
+                <th className="h-12 px-4 text-left font-medium text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    扫描策略
+                  </div>
                 </th>
                 <th className="h-12 px-4 text-left font-medium text-muted-foreground">
                   <div className="flex items-center gap-2">
@@ -141,6 +152,20 @@ export function SitesTableSSR({
                     )}
                   </td>
                   <td className="p-4">
+                    <div className="space-y-1 text-xs text-muted-foreground">
+                      <div>
+                        优先级：P{r.scanPriority ?? 1}
+                      </div>
+                      <div>
+                        间隔：{r.scanIntervalMinutes ?? 1440} 分钟
+                      </div>
+                      <div>
+                        上次：
+                        {r.lastScanAt ? formatDateTime(r.lastScanAt, { includeSeconds: false }) : "—"}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="p-4">
                     <StatusIndicator status={r.enabled ? "success" : "pending"}>
                       {r.enabled ? "启用中" : "已禁用"}
                     </StatusIndicator>
@@ -170,7 +195,7 @@ export function SitesTableSSR({
               ))}
               {data.length === 0 && (
                 <tr>
-                  <td className="p-0" colSpan={5}>
+                  <td className="p-0" colSpan={6}>
                     <EmptyState
                       title="暂无站点数据"
                       description="开始添加您的第一个站点进行监控"

@@ -7,7 +7,16 @@ import { discover, rediscoverSite } from "@/lib/logic/discover";
 import { enqueueScan, cronScan } from "@/lib/logic/scan";
 import { getSiteDetail } from "@/lib/logic/site-detail";
 import { db } from "@/lib/db";
-import { users, sites, changes, sitemaps, urls, scans, webhooks } from "@/lib/drizzle/schema";
+import {
+  users,
+  sites,
+  changes,
+  sitemaps,
+  urls,
+  scans,
+  webhooks,
+  notificationChannels,
+} from "@/lib/drizzle/schema";
 import { desc, and, eq, gte, lte } from "drizzle-orm";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/session";
 import type { SQL } from "drizzle-orm";
@@ -80,6 +89,8 @@ app.patch("/sites/:id", async (c) => {
       rootUrl: z.string().url().optional(),
       enabled: z.boolean().optional(),
       tags: z.array(z.string()).optional(),
+      scanPriority: z.number().int().min(1).max(5).optional(),
+      scanIntervalMinutes: z.number().int().min(5).max(10080).optional(),
     })
     .refine((data) => Object.keys(data).length > 0, {
       message: "no updates provided",
@@ -114,6 +125,9 @@ app.patch("/sites/:id", async (c) => {
   if (body.enabled !== undefined) updatePayload.enabled = body.enabled;
   if (normalizedTags !== undefined)
     updatePayload.tags = normalizedTags.length ? JSON.stringify(normalizedTags) : null;
+  if (body.scanPriority !== undefined) updatePayload.scanPriority = body.scanPriority;
+  if (body.scanIntervalMinutes !== undefined)
+    updatePayload.scanIntervalMinutes = body.scanIntervalMinutes;
   if (Object.keys(updatePayload).length)
     await db
       .update(sites)
@@ -277,6 +291,83 @@ app.post("/sites/:id/test-webhook", async (c) => {
   return c.json({ ok: true });
 });
 
+app.get("/sites/:id/notifications", async (c) => {
+  const siteId = c.req.param("id");
+  const ownerId = c.get("userId");
+
+  const [site] = await db
+    .select({ id: sites.id })
+    .from(sites)
+    .where(and(eq(sites.id, siteId), eq(sites.ownerId, ownerId)))
+    .limit(1);
+  if (!site) return c.json({ error: "not found" }, 404);
+
+  const channels = await db
+    .select({
+      id: notificationChannels.id,
+      type: notificationChannels.type,
+      target: notificationChannels.target,
+      secret: notificationChannels.secret,
+      createdAt: notificationChannels.createdAt,
+    })
+    .from(notificationChannels)
+    .where(eq(notificationChannels.siteId, siteId));
+
+  return c.json({ channels });
+});
+
+app.post("/sites/:id/notifications", async (c) => {
+  const siteId = c.req.param("id");
+  const ownerId = c.get("userId");
+
+  const [site] = await db
+    .select({ id: sites.id })
+    .from(sites)
+    .where(and(eq(sites.id, siteId), eq(sites.ownerId, ownerId)))
+    .limit(1);
+  if (!site) return c.json({ error: "not found" }, 404);
+
+  const body = await c.req.json();
+  const schema = z.object({
+    type: z.enum(["webhook", "email", "slack"]),
+    target: z.string().min(3),
+    secret: z.string().optional(),
+  });
+  const payload = schema.parse(body);
+
+  const id = randomUUID();
+  await db
+    .insert(notificationChannels)
+    .values({
+      id,
+      siteId,
+      type: payload.type,
+      target: payload.target.trim(),
+      secret: payload.secret?.trim() || null,
+    });
+
+  return c.json({ ok: true, id });
+});
+
+app.delete("/sites/:id/notifications/:notificationId", async (c) => {
+  const siteId = c.req.param("id");
+  const notificationId = c.req.param("notificationId");
+  const ownerId = c.get("userId");
+
+  const [site] = await db
+    .select({ id: sites.id })
+    .from(sites)
+    .where(and(eq(sites.id, siteId), eq(sites.ownerId, ownerId)))
+    .limit(1);
+  if (!site) return c.json({ error: "not found" }, 404);
+
+  await db
+    .delete(notificationChannels)
+    .where(and(eq(notificationChannels.siteId, siteId), eq(notificationChannels.id, notificationId)));
+
+  return c.json({ ok: true });
+});
+
 app.get("/sites/:id/changes.csv", async (c) => {
   const id = c.req.param("id");
   const ownerId = c.get("userId");
@@ -343,6 +434,60 @@ app.get("/sites/:id/changes.csv", async (c) => {
   return c.body(csv, 200, {
     "content-type": "text/csv; charset=utf-8",
     "content-disposition": `attachment; filename="changes-${id}.csv"`,
+  });
+});
+
+app.get("/sites/:id/scan-diff", async (c) => {
+  const siteId = c.req.param("id");
+  const ownerId = c.get("userId");
+  const url = new URL(c.req.url);
+  const scanId = url.searchParams.get("scanId");
+  if (!scanId) return c.json({ error: "scanId required" }, 400);
+
+  const [scanRow] = await db
+    .select({
+      id: scans.id,
+      siteId: scans.siteId,
+      startedAt: scans.startedAt,
+      finishedAt: scans.finishedAt,
+    })
+    .from(scans)
+    .where(eq(scans.id, scanId));
+  if (!scanRow || scanRow.siteId !== siteId) return c.json({ error: "not found" }, 404);
+
+  const [site] = await db
+    .select({ ownerId: sites.ownerId })
+    .from(sites)
+    .where(eq(sites.id, siteId))
+    .limit(1);
+  if (!site || site.ownerId !== ownerId) return c.json({ error: "not found" }, 404);
+
+  const rows = await db
+    .select({
+      type: changes.type,
+      detail: changes.detail,
+      occurredAt: changes.occurredAt,
+    })
+    .from(changes)
+    .where(and(eq(changes.siteId, siteId), eq(changes.scanId, scanId)))
+    .orderBy(desc(changes.occurredAt));
+
+  const summary = rows.reduce(
+    (acc, row) => {
+      if (row.type === "added") acc.added += 1;
+      else if (row.type === "removed") acc.removed += 1;
+      else if (row.type === "updated") acc.updated += 1;
+      return acc;
+    },
+    { added: 0, removed: 0, updated: 0 },
+  );
+
+  return c.json({
+    scanId,
+    summary,
+    items: rows,
+    startedAt: scanRow.startedAt,
+    finishedAt: scanRow.finishedAt,
   });
 });
 

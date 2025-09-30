@@ -107,6 +107,13 @@ export default async function RootLayout({
                       </Link>
                       <Link
                         className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary hover:underline underline-offset-4"
+                        href="/dashboard/tasks"
+                        aria-label="解析任务监控"
+                      >
+                        任务监控
+                      </Link>
+                      <Link
+                        className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary hover:underline underline-offset-4"
                         href="/blog"
                         aria-label="SEO优化博客"
                       >
@@ -148,7 +155,7 @@ export default async function RootLayout({
             </main>
             <footer className="border-t bg-muted/50" role="contentinfo">
               <div className="container flex h-14 items-center justify-between text-sm text-muted-foreground">
-                <p>© 2024 Sitemap Monitor. 智能化网站监控解决方案</p>
+                <p>© 2025 Sitemap Monitor. 智能化网站监控解决方案</p>
                 <p>Powered by Next.js & Tailwind CSS</p>
               </div>
             </footer>

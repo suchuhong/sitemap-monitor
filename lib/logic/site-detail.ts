@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { sites, sitemaps, urls, scans, changes } from "@/lib/drizzle/schema";
+import { sites, sitemaps, urls, scans, changes, notificationChannels } from "@/lib/drizzle/schema";
 import { and, desc, eq, sql } from "drizzle-orm";
 
 type DetailOptions = {
@@ -22,6 +22,9 @@ export async function getSiteDetail({
       robotsUrl: sites.robotsUrl,
       enabled: sites.enabled,
       tags: sites.tags,
+      scanPriority: sites.scanPriority,
+      scanIntervalMinutes: sites.scanIntervalMinutes,
+      lastScanAt: sites.lastScanAt,
       createdAt: sites.createdAt,
       updatedAt: sites.updatedAt,
     })
@@ -77,6 +80,7 @@ export async function getSiteDetail({
       totalUrls: scans.totalUrls,
       added: scans.added,
       removed: scans.removed,
+      updated: scans.updated,
       startedAt: scans.startedAt,
       finishedAt: scans.finishedAt,
       error: scans.error,
@@ -125,6 +129,7 @@ export async function getSiteDetail({
     summary,
     recentScans,
     recentChanges,
+    notifications: await fetchNotificationChannels(site.id),
   };
 }
 
@@ -136,4 +141,17 @@ function safeParseTags(value: string | null | undefined) {
       return parsed.filter((item) => typeof item === "string" && item.trim()).map((s) => s.trim());
   } catch {}
   return [] as string[];
+}
+
+async function fetchNotificationChannels(siteId: string) {
+  const rows = await db
+    .select({
+      id: notificationChannels.id,
+      type: notificationChannels.type,
+      target: notificationChannels.target,
+      createdAt: notificationChannels.createdAt,
+    })
+    .from(notificationChannels)
+    .where(eq(notificationChannels.siteId, siteId));
+  return rows;
 }

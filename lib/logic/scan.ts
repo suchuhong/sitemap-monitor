@@ -20,22 +20,50 @@ const scanQueue: ScanJob[] = [];
 let processing = false;
 
 export async function cronScan() {
+  const now = Date.now();
   const activeSites = await db
-    .select()
+    .select({
+      id: sites.id,
+      scanPriority: sites.scanPriority,
+      scanIntervalMinutes: sites.scanIntervalMinutes,
+      lastScanAt: sites.lastScanAt,
+    })
     .from(sites)
     .where(eq(sites.enabled, true));
+
+  const dueSites = activeSites
+    .map((site) => {
+      const intervalMinutes = site.scanIntervalMinutes ?? 1440;
+      const intervalMs = Math.max(intervalMinutes, 5) * 60 * 1000;
+      const last = site.lastScanAt ? new Date(site.lastScanAt).getTime() : 0;
+      return {
+        ...site,
+        isDue: !last || now - last >= intervalMs,
+      };
+    })
+    .filter((site) => site.isDue)
+    .sort((a, b) => {
+      const priorityDiff = (b.scanPriority ?? 1) - (a.scanPriority ?? 1);
+      if (priorityDiff !== 0) return priorityDiff;
+      const aLast = a.lastScanAt ? new Date(a.lastScanAt).getTime() : 0;
+      const bLast = b.lastScanAt ? new Date(b.lastScanAt).getTime() : 0;
+      return aLast - bLast;
+    });
+
   const results: Array<Record<string, unknown>> = [];
-  for (const s of activeSites) {
+  for (const site of dueSites) {
     try {
-      results.push(await runScanNow(s.id));
+      const { scanId } = await enqueueScan(site.id);
+      results.push({ siteId: site.id, scanId, status: "queued" });
     } catch (err) {
       results.push({
-        siteId: s.id,
+        siteId: site.id,
         error: err instanceof Error ? err.message : String(err),
       });
     }
   }
-  return { sites: activeSites.length, results };
+
+  return { sitesChecked: activeSites.length, queued: dueSites.length, results };
 }
 
 export async function runScanNow(siteId: string) {
@@ -64,7 +92,7 @@ async function processQueue() {
   try {
     await executeScan(job);
   } catch (err) {
-    console.error("scan job failed", job.siteId, err);
+    console.error("scan job failed", job.siteId, err instanceof Error ? err.stack : err);
   } finally {
     processing = false;
     if (scanQueue.length) void processQueue();
@@ -86,15 +114,17 @@ async function executeScan({ scanId, siteId }: ScanJob) {
   let totalUrls = 0;
   let added = 0;
   let removed = 0;
+  let updated = 0;
   const errors: string[] = [];
 
   try {
     for (const sm of smaps) {
       try {
-        const r = await scanOneSitemap(siteId, sm);
-        totalUrls += r.urlCount;
-        added += r.urlsAdded;
-        removed += r.urlsRemoved;
+        const result = await scanOneSitemap({ siteId, sitemap: sm, scanId });
+        totalUrls += result.urlCount;
+        added += result.urlsAdded;
+        removed += result.urlsRemoved;
+        updated += result.urlsUpdated;
       } catch (err) {
         errors.push(`${sm.url}: ${err instanceof Error ? err.message : String(err)}`);
       }
@@ -112,23 +142,29 @@ async function executeScan({ scanId, siteId }: ScanJob) {
         totalUrls,
         added,
         removed,
+        updated,
         error: errors.length ? errors.join("; ") : null,
       })
       .where(eq(scans.id, scanId));
 
-    if (!errors.length && (added || removed)) {
+    await db
+      .update(sites)
+      .set({ lastScanAt: finishedAt, updatedAt: finishedAt })
+      .where(eq(sites.id, siteId));
+
+    if (!errors.length && (added || removed || updated)) {
       try {
-        await notifyChange(siteId, { scanId, added, removed });
+        await notifyChange(siteId, { scanId, added, removed, updated });
       } catch (err) {
-        console.warn("webhook notify failed", siteId, err);
+        console.warn("notify failed", siteId, err);
       }
     }
 
     if (errors.length) {
-      return { siteId, scanId, totalUrls, added, removed, status, errors };
+      return { siteId, scanId, totalUrls, added, removed, updated, status, errors };
     }
 
-    return { siteId, scanId, totalUrls, added, removed, status };
+    return { siteId, scanId, totalUrls, added, removed, updated, status };
   } catch (error) {
     const finishedAt = new Date();
     const message = error instanceof Error ? error.message : String(error);
@@ -140,6 +176,10 @@ async function executeScan({ scanId, siteId }: ScanJob) {
         error: message,
       })
       .where(eq(scans.id, scanId));
+    await db
+      .update(sites)
+      .set({ lastScanAt: finishedAt, updatedAt: finishedAt })
+      .where(eq(sites.id, siteId));
     throw error;
   }
 }
@@ -153,7 +193,15 @@ type ParsedSitemapUrl = {
   priority?: string;
 };
 
-async function scanOneSitemap(siteId: string, sm: SitemapRow) {
+async function scanOneSitemap({
+  siteId,
+  sitemap: sm,
+  scanId,
+}: {
+  siteId: string;
+  sitemap: SitemapRow;
+  scanId: string;
+}) {
   const headers: Record<string, string> = {};
   if (sm.lastEtag) headers["If-None-Match"] = sm.lastEtag;
   if (sm.lastModified) headers["If-Modified-Since"] = sm.lastModified;
@@ -181,7 +229,7 @@ async function scanOneSitemap(siteId: string, sm: SitemapRow) {
 
   if (res.status === 304) {
     await db.update(sitemaps).set(sitemapUpdate).where(eq(sitemaps.id, sm.id));
-    return { changed: false, urlsAdded: 0, urlsRemoved: 0, urlCount: 0 };
+    return { changed: false, urlsAdded: 0, urlsRemoved: 0, urlsUpdated: 0, urlCount: 0 };
   }
   if (!res.ok) {
     await db.update(sitemaps).set(sitemapUpdate).where(eq(sitemaps.id, sm.id));
@@ -253,7 +301,20 @@ async function scanOneSitemap(siteId: string, sm: SitemapRow) {
 
   const toRemove = existing.filter((row) => !locMap.has(row.loc));
 
+  let updatedCount = 0;
+
   for (const { record, detail } of toKeep) {
+    const changesForUrl: string[] = [];
+    if (detail.lastmod && detail.lastmod !== record.lastmod) {
+      changesForUrl.push(`lastmod ${record.lastmod ?? "-"} → ${detail.lastmod}`);
+    }
+    if (detail.changefreq && detail.changefreq !== record.changefreq) {
+      changesForUrl.push(`changefreq ${record.changefreq ?? "-"} → ${detail.changefreq}`);
+    }
+    if (detail.priority && detail.priority !== record.priority) {
+      changesForUrl.push(`priority ${record.priority ?? "-"} → ${detail.priority}`);
+    }
+
     await db
       .update(urls)
       .set({
@@ -264,6 +325,20 @@ async function scanOneSitemap(siteId: string, sm: SitemapRow) {
         status: "active",
       })
       .where(eq(urls.id, record.id));
+
+    if (changesForUrl.length) {
+      updatedCount += 1;
+      await db
+        .insert(changes)
+        .values({
+          id: randomUUID(),
+          siteId,
+          scanId,
+          urlId: record.id,
+          type: "updated",
+          detail: `${record.loc} | ${changesForUrl.join("; ")}`,
+        });
+    }
   }
 
   for (const detail of toAdd) {
@@ -287,6 +362,7 @@ async function scanOneSitemap(siteId: string, sm: SitemapRow) {
       .values({
         id: randomUUID(),
         siteId,
+        scanId,
         urlId,
         type: "added",
         detail: detail.loc,
@@ -303,6 +379,7 @@ async function scanOneSitemap(siteId: string, sm: SitemapRow) {
       .values({
         id: randomUUID(),
         siteId,
+        scanId,
         urlId: row.id,
         type: "removed",
         detail: row.loc,
@@ -315,6 +392,7 @@ async function scanOneSitemap(siteId: string, sm: SitemapRow) {
     changed: true,
     urlsAdded: toAdd.length,
     urlsRemoved: toRemove.length,
+    urlsUpdated: updatedCount,
     urlCount: locMap.size,
   };
 }

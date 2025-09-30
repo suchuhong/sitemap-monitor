@@ -45,10 +45,22 @@ export default async function SitesPage({
 }: {
   searchParams?: Promise<Record<string, string | string[]>>;
 }) {
-  const user = await requireUser();
   const params = (searchParams ? await searchParams : {}) as
     | Record<string, string | string[]>
     | undefined;
+
+  const redirectParams = new URLSearchParams();
+  if (params) {
+    for (const [key, value] of Object.entries(params)) {
+      if (Array.isArray(value)) {
+        value.forEach((item) => redirectParams.append(key, item));
+      } else if (value) {
+        redirectParams.append(key, value);
+      }
+    }
+  }
+  const redirectTo = `/sites${redirectParams.toString() ? `?${redirectParams.toString()}` : ""}`;
+  const user = await requireUser({ redirectTo });
 
   const tagParam = getParam(params, "tags", "");
   const selectedTags = tagParam
@@ -86,6 +98,9 @@ export default async function SitesPage({
       robotsUrl: sites.robotsUrl,
       enabled: sites.enabled,
       tags: sites.tags,
+      scanPriority: sites.scanPriority,
+      scanIntervalMinutes: sites.scanIntervalMinutes,
+      lastScanAt: sites.lastScanAt,
       createdAt: sites.createdAt,
     })
     .from(sites)

@@ -18,6 +18,9 @@ export const sites = sqliteTable("sites", {
   robotsUrl: text("robots_url"),
   enabled: integer("enabled", { mode: "boolean" }).default(true),
   tags: text("tags"),
+  scanPriority: integer("scan_priority").default(1),
+  scanIntervalMinutes: integer("scan_interval_minutes").default(1440),
+  lastScanAt: integer("last_scan_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" }).default(
     sql`(unixepoch())`,
   ),
@@ -78,6 +81,7 @@ export const scans = sqliteTable("scans", {
   totalUrls: integer("total_urls").default(0),
   added: integer("added").default(0),
   removed: integer("removed").default(0),
+  updated: integer("updated").default(0),
   status: text("status").default("running"),
   error: text("error"),
 });
@@ -87,6 +91,7 @@ export const changes = sqliteTable("changes", {
   siteId: text("site_id")
     .notNull()
     .references(() => sites.id),
+  scanId: text("scan_id").references(() => scans.id),
   urlId: text("url_id").references(() => urls.id),
   type: text("type").notNull(),
   detail: text("detail"),
@@ -101,6 +106,19 @@ export const webhooks = sqliteTable("webhooks", {
     .notNull()
     .references(() => sites.id),
   targetUrl: text("target_url").notNull(),
+  secret: text("secret"),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(
+    sql`(unixepoch())`,
+  ),
+});
+
+export const notificationChannels = sqliteTable("notification_channels", {
+  id: text("id").primaryKey(),
+  siteId: text("site_id")
+    .notNull()
+    .references(() => sites.id),
+  type: text("type").notNull(),
+  target: text("target").notNull(),
   secret: text("secret"),
   createdAt: integer("created_at", { mode: "timestamp" }).default(
     sql`(unixepoch())`,

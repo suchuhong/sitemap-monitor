@@ -13,6 +13,8 @@ import { requireUser } from "@/lib/auth/session";
 import { SiteActionsPanel } from "./_components/site-actions";
 import { ConfirmScan } from "./_components/ConfirmScan";
 import { ScanTrendChart, type ScanPoint } from "./_components/scan-trend-chart";
+import { SiteNotificationsPanel } from "./_components/site-notifications";
+import { ScanDiffPanel } from "./_components/scan-diff-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -22,11 +24,11 @@ export default async function SiteDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const user = await requireUser();
+  const user = await requireUser({ redirectTo: `/sites/${id}` });
   const detail = await getSiteDetail({ siteId: id, ownerId: user.id, scansLimit: 20 });
   if (!detail) notFound();
 
-  const { site, sitemaps, summary, recentScans, recentChanges } = detail;
+  const { site, sitemaps, summary, recentScans, recentChanges, notifications } = detail;
   const scanTrendPoints: ScanPoint[] = recentScans
     .filter((scan) => scan?.startedAt)
     .map((scan) => ({
@@ -34,8 +36,17 @@ export default async function SiteDetailPage({
       totalUrls: Number(scan.totalUrls ?? 0),
       added: Number(scan.added ?? 0),
       removed: Number(scan.removed ?? 0),
+      updated: Number(scan.updated ?? 0),
     }))
     .filter((p) => Number.isFinite(p.startedAt));
+
+  const notificationChannels = notifications.map((channel) => ({
+    ...channel,
+    createdAt:
+      channel.createdAt instanceof Date
+        ? channel.createdAt.getTime()
+        : channel.createdAt ?? null,
+  }));
 
   return (
     <div className="space-y-6">
@@ -43,8 +54,10 @@ export default async function SiteDetailPage({
         <Link href="/sites" className="text-sm text-slate-600 hover:underline">
           ← 返回列表
         </Link>
-        <div className="text-xs text-slate-500">
-          最近更新：{formatDateTime(site.updatedAt, { includeSeconds: true })}
+        <div className="text-xs text-slate-500 space-x-2">
+          <span>最近更新：{formatDateTime(site.updatedAt, { includeSeconds: true })}</span>
+          <span>•</span>
+          <span>最近扫描：{site.lastScanAt ? formatDateTime(site.lastScanAt, { includeSeconds: true }) : "—"}</span>
         </div>
       </div>
 
@@ -79,6 +92,14 @@ export default async function SiteDetailPage({
               <Badge variant={site.enabled ? "added" : "removed"}>
                 {site.enabled ? "已启用" : "已禁用"}
               </Badge>
+            </div>
+            <div>
+              <span className="text-slate-500">扫描优先级：</span>
+              P{site.scanPriority ?? 1}
+            </div>
+            <div>
+              <span className="text-slate-500">扫描间隔：</span>
+              {site.scanIntervalMinutes ? `${site.scanIntervalMinutes} 分钟` : "默认"}
             </div>
             <div>
               <span className="text-slate-500">标签：</span>
@@ -132,7 +153,18 @@ export default async function SiteDetailPage({
         initialRootUrl={site.rootUrl}
         initialEnabled={Boolean(site.enabled)}
         initialTags={Array.isArray(site.tags) ? site.tags : []}
+        initialPriority={site.scanPriority ?? 1}
+        initialInterval={site.scanIntervalMinutes ?? 1440}
       />
+
+      <SiteNotificationsPanel siteId={site.id} initialChannels={notificationChannels} />
+
+      <ScanDiffPanel siteId={site.id} scans={recentScans.map((scan) => ({
+        id: scan.id,
+        startedAt: scan.startedAt,
+        finishedAt: scan.finishedAt,
+        status: scan.status,
+      }))} />
 
       <ScanTrendChart points={scanTrendPoints} />
 
@@ -220,6 +252,7 @@ export default async function SiteDetailPage({
                   <span>URL：{scan.totalUrls}</span>
                   <span>新增：{scan.added}</span>
                   <span>移除：{scan.removed}</span>
+                  <span>更新：{scan.updated ?? 0}</span>
                 </div>
                 <div className="mt-2 text-xs text-slate-500">
                   {scan.finishedAt ? `完成于 ${formatDate(scan.finishedAt)}` : "进行中"}

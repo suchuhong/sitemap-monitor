@@ -13,6 +13,10 @@ export async function signInAction(
 ): Promise<SignInState | void> {
   const rawEmail = formData.get("email");
   const email = typeof rawEmail === "string" ? rawEmail : "";
+  const redirectInput = formData.get("redirect");
+  const redirectTarget = sanitizeRedirect(
+    typeof redirectInput === "string" ? redirectInput : undefined,
+  ) ?? "/dashboard";
 
   try {
     await createUserSession(email);
@@ -21,10 +25,17 @@ export async function signInAction(
     return { error: message };
   }
 
-  redirect("/dashboard");
+  redirect(redirectTarget);
 }
 
 export async function signOutAction() {
   await clearSession();
-  redirect("/login");
+  redirect("/?signedOut=1");
+}
+
+function sanitizeRedirect(value?: string) {
+  if (!value) return null;
+  if (!value.startsWith("/")) return null;
+  if (value.startsWith("//")) return null;
+  return value;
 }

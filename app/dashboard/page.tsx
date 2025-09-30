@@ -7,7 +7,7 @@ import { sql, gte, desc, eq, and } from "drizzle-orm";
 import { requireUser } from "@/lib/auth/session";
 
 export default async function Page() {
-  const user = await requireUser();
+  const user = await requireUser({ redirectTo: "/dashboard" });
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
   const [siteRow] = await db

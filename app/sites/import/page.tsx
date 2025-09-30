@@ -4,7 +4,7 @@ import { requireUser } from "@/lib/auth/session";
 export const dynamic = "force-dynamic";
 
 export default async function ImportSitesPage() {
-  await requireUser();
+  await requireUser({ redirectTo: "/sites/import" });
   return (
     <div className="max-w-2xl space-y-4">
       <h1 className="text-xl font-semibold">批量导入站点</h1>

@@ -7,8 +7,9 @@ type FetchOptions = Omit<RequestInit, "signal"> & {
 
 export async function fetchWithCompression(url: string, opts: FetchOptions = {}) {
   const { timeout = 10000, headers = {}, ...rest } = opts;
+  const safeTimeout = Number.isFinite(timeout) && timeout > 0 ? timeout : 10000;
   const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), timeout);
+  const id = setTimeout(() => controller.abort(), safeTimeout);
   try {
     const res = await fetch(url, {
       ...rest,
@@ -32,7 +33,8 @@ export async function retry<T>(fn: () => Promise<T>, retries = 2) {
       return await fn();
     } catch (e) {
       lastErr = e;
-      await sleep(200 * (i + 1));
+      const delay = 200 * (i + 1);
+      await sleep(Number.isFinite(delay) && delay > 0 ? delay : 200);
     }
   }
   throw lastErr;

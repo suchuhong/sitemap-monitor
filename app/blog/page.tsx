@@ -12,11 +12,11 @@ export const metadata: Metadata = {
 const blogPosts = [
   {
     id: 1,
-    title: "2024年网站地图优化完整指南：提升SEO效果的关键策略",
+    title: "2025年网站地图优化完整指南：提升SEO效果的关键策略",
     excerpt: "深入解析如何优化网站地图以提升搜索引擎排名。包含最新的SEO最佳实践、技术实现方法和常见问题解决方案。",
     category: "SEO优化",
     readTime: "8分钟阅读",
-    publishDate: "2024-01-15",
+    publishDate: "2025-01-15",
     tags: ["sitemap", "SEO", "网站优化"],
     featured: true
   },
@@ -26,7 +26,7 @@ const blogPosts = [
     excerpt: "分享监控大型电商网站sitemap的实战经验，包括技术挑战、解决方案和效果评估。适合电商运营和技术团队。",
     category: "技术实践",
     readTime: "12分钟阅读", 
-    publishDate: "2024-01-10",
+    publishDate: "2025-01-10",
     tags: ["电商SEO", "大型网站", "监控策略"]
   },
   {
@@ -35,7 +35,7 @@ const blogPosts = [
     excerpt: "详细分析主流搜索引擎对sitemap的处理机制，帮助您制定更有针对性的SEO策略。",
     category: "搜索引擎",
     readTime: "10分钟阅读",
-    publishDate: "2024-01-05", 
+    publishDate: "2025-01-05", 
     tags: ["Google", "百度", "搜索引擎"]
   },
   {
@@ -44,7 +44,7 @@ const blogPosts = [
     excerpt: "详细的WordPress网站sitemap监控设置教程，包括插件推荐、配置方法和常见问题解决。",
     category: "WordPress",
     readTime: "6分钟阅读",
-    publishDate: "2024-01-01",
+    publishDate: "2025-01-01",
     tags: ["WordPress", "自动化", "教程"]
   },
   {
