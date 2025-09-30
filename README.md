@@ -30,6 +30,7 @@ Sitemap Monitor 是一个基于 Next.js 15 的示例项目，用于接入站点�
 - **趋势分析仪表盘**：`/dashboard` 新增变更趋势图与状态汇总，聚合 30 天数据。
 - **分组与批量管理**：通过 `/sites/groups`、`/sites/bulk` 管理站点分组及标签批量操作。
 - **变更归因与指派**：站点详情的变更面板支持记录来源、负责人与状态。
+- **可观测性面板**：全局记录 API/任务日志，可用作运营大屏的数据源。
 
 ## 技术栈
 
@@ -96,6 +97,7 @@ Sitemap Monitor 是一个基于 Next.js 15 的示例项目，用于接入站点�
 - `/sites/import`：批量导入工具（详见下文指南）。
 - `/sites/:id`：站点详情（sitemap 列表、扫描记录、变更时间线）。
 - `/styleguide`：UI 组件示例页，方便在实际页面中保持视觉一致性。
+- `/dashboard/logs`（即将推出）：可基于 `observability_logs` 数据源搭建自定义告警与运营看板。
 
 ## 主要脚本
 
@@ -261,3 +263,4 @@ Sitemap Monitor 是一个基于 Next.js 15 的示例项目，用于接入站点�
 - 阶段 1 新增能力（登录、队列、批量导入反馈等）的使用说明见 `docs/stage-one-guide.md`。
 - 阶段 2 “监控能力增强”（差异报告、多渠道告警、智能调度）使用指南见 `docs/stage-two-guide.md`。
 - 阶段 3 “分析与运营工具”（趋势分析、分组管理、变更归因）使用指南见 `docs/stage-three-guide.md`。
+- 可观测性与日志采集说明见 `docs/observability.md`。

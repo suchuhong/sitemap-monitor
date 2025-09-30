@@ -20,11 +20,12 @@ import {
 } from "@/lib/drizzle/schema";
 import { desc, and, eq, gte, lte } from "drizzle-orm";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/session";
+import { logEvent } from "@/lib/observability/logger";
 import type { SQL } from "drizzle-orm";
 
 export const config = { runtime: "nodejs" };
 
-const app = new Hono<{ Variables: { userId: string } }>().basePath("/api");
+const app = new Hono<{ Variables: { userId: string; userEmail?: string; requestId: string } }>().basePath("/api");
 
 app.use("*", async (c, next) => {
   const sessionId = getCookie(c, SESSION_COOKIE_NAME);
