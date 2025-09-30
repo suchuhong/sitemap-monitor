@@ -1,8 +1,10 @@
 import { SiteImportForm } from "./import-form";
+import { requireUser } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
-export default function ImportSitesPage() {
+export default async function ImportSitesPage() {
+  await requireUser();
   return (
     <div className="max-w-2xl space-y-4">
       <h1 className="text-xl font-semibold">批量导入站点</h1>

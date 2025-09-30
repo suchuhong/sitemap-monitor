@@ -11,6 +11,14 @@ const xmlParser = new XMLParser({
   attributeNamePrefix: "",
 });
 
+type ScanJob = {
+  scanId: string;
+  siteId: string;
+};
+
+const scanQueue: ScanJob[] = [];
+let processing = false;
+
 export async function cronScan() {
   const activeSites = await db
     .select()
@@ -19,7 +27,7 @@ export async function cronScan() {
   const results: Array<Record<string, unknown>> = [];
   for (const s of activeSites) {
     try {
-      results.push(await scanSite(s.id));
+      results.push(await runScanNow(s.id));
     } catch (err) {
       results.push({
         siteId: s.id,
@@ -30,11 +38,46 @@ export async function cronScan() {
   return { sites: activeSites.length, results };
 }
 
-export async function scanSite(siteId: string) {
+export async function runScanNow(siteId: string) {
   const scanId = randomUUID();
   await db
     .insert(scans)
-    .values({ id: scanId, siteId, status: "running", startedAt: new Date() });
+    .values({ id: scanId, siteId, status: "queued", startedAt: new Date() });
+  return executeScan({ scanId, siteId });
+}
+
+export async function enqueueScan(siteId: string) {
+  const scanId = randomUUID();
+  await db
+    .insert(scans)
+    .values({ id: scanId, siteId, status: "queued", startedAt: new Date() });
+  scanQueue.push({ scanId, siteId });
+  void processQueue();
+  return { scanId };
+}
+
+async function processQueue() {
+  if (processing) return;
+  const job = scanQueue.shift();
+  if (!job) return;
+  processing = true;
+  try {
+    await executeScan(job);
+  } catch (err) {
+    console.error("scan job failed", job.siteId, err);
+  } finally {
+    processing = false;
+    if (scanQueue.length) void processQueue();
+  }
+}
+
+async function executeScan({ scanId, siteId }: ScanJob) {
+  const startTime = new Date();
+  await db
+    .update(scans)
+    .set({ status: "running", startedAt: startTime })
+    .where(eq(scans.id, scanId));
+
   const smaps = await db
     .select()
     .from(sitemaps)
@@ -45,46 +88,60 @@ export async function scanSite(siteId: string) {
   let removed = 0;
   const errors: string[] = [];
 
-  for (const sm of smaps) {
-    try {
-      const r = await scanOneSitemap(siteId, sm);
-      totalUrls += r.urlCount;
-      added += r.urlsAdded;
-      removed += r.urlsRemoved;
-    } catch (err) {
-      errors.push(`${sm.url}: ${err instanceof Error ? err.message : String(err)}`);
+  try {
+    for (const sm of smaps) {
+      try {
+        const r = await scanOneSitemap(siteId, sm);
+        totalUrls += r.urlCount;
+        added += r.urlsAdded;
+        removed += r.urlsRemoved;
+      } catch (err) {
+        errors.push(`${sm.url}: ${err instanceof Error ? err.message : String(err)}`);
+      }
     }
-  }
 
-  const status = errors.length ? "failed" : "success";
-  const finishedAt = new Date();
+    const status = errors.length ? "failed" : "success";
+    const finishedAt = new Date();
 
-  await db
-    .update(scans)
-    .set({
-      status,
-      finishedAt,
-      totalSitemaps: smaps.length,
-      totalUrls,
-      added,
-      removed,
-      error: errors.length ? errors.join("; ") : null,
-    })
-    .where(eq(scans.id, scanId));
+    await db
+      .update(scans)
+      .set({
+        status,
+        finishedAt,
+        totalSitemaps: smaps.length,
+        totalUrls,
+        added,
+        removed,
+        error: errors.length ? errors.join("; ") : null,
+      })
+      .where(eq(scans.id, scanId));
 
-  if (!errors.length && (added || removed)) {
-    try {
-      await notifyChange(siteId, { scanId, added, removed });
-    } catch (err) {
-      console.warn("webhook notify failed", siteId, err);
+    if (!errors.length && (added || removed)) {
+      try {
+        await notifyChange(siteId, { scanId, added, removed });
+      } catch (err) {
+        console.warn("webhook notify failed", siteId, err);
+      }
     }
-  }
 
-  if (errors.length) {
-    return { siteId, scanId, totalUrls, added, removed, status, errors };
-  }
+    if (errors.length) {
+      return { siteId, scanId, totalUrls, added, removed, status, errors };
+    }
 
-  return { siteId, scanId, totalUrls, added, removed, status };
+    return { siteId, scanId, totalUrls, added, removed, status };
+  } catch (error) {
+    const finishedAt = new Date();
+    const message = error instanceof Error ? error.message : String(error);
+    await db
+      .update(scans)
+      .set({
+        status: "failed",
+        finishedAt,
+        error: message,
+      })
+      .where(eq(scans.id, scanId));
+    throw error;
+  }
 }
 
 type SitemapRow = typeof sitemaps.$inferSelect;

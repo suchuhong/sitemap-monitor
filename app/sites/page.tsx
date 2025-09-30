@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { sites } from "@/lib/drizzle/schema";
-import { sql, asc, desc, and } from "drizzle-orm";
+import { requireUser } from "@/lib/auth/session";
+import { sql, asc, desc, and, eq } from "drizzle-orm";
 import {
   SitesTableSSR,
   type SitesTableRow,
@@ -44,6 +45,7 @@ export default async function SitesPage({
 }: {
   searchParams?: Promise<Record<string, string | string[]>>;
 }) {
+  const user = await requireUser();
   const params = (searchParams ? await searchParams : {}) as
     | Record<string, string | string[]>
     | undefined;
@@ -67,8 +69,13 @@ export default async function SitesPage({
 
   const tagWhere = selectedTags.length ? buildTagsWhereClause(selectedTags) : undefined;
 
-  const countQuery = db.select({ count: sql<number>`count(*)` }).from(sites);
-  const [{ count = 0 } = {}] = tagWhere ? await countQuery.where(tagWhere) : await countQuery;
+  const ownerCondition = eq(sites.ownerId, user.id);
+  const combinedWhere = tagWhere ? and(ownerCondition, tagWhere) : ownerCondition;
+
+  const [{ count = 0 } = {}] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(sites)
+    .where(combinedWhere);
   const total = Number(count ?? 0);
 
   const orderByClause = dir === "asc" ? asc(orderCol) : desc(orderCol);
@@ -85,9 +92,9 @@ export default async function SitesPage({
     .orderBy(orderByClause)
     .limit(pageSize)
     .offset(offset);
-  const rows = (tagWhere ? await rowsQuery.where(tagWhere) : await rowsQuery) as SitesTableRow[];
+  const rows = (await rowsQuery.where(combinedWhere)) as SitesTableRow[];
 
-  const availableTags = await fetchDistinctTags();
+  const availableTags = await fetchDistinctTags(user.id);
 
   return (
     <div className="space-y-8">
@@ -192,11 +199,13 @@ export default async function SitesPage({
   );
 }
 
-async function fetchDistinctTags() {
+async function fetchDistinctTags(ownerId: string) {
   const rows = await db
     .select({ tags: sites.tags })
     .from(sites)
-    .where(sql`tags is not null and tags != ''`);
+    .where(
+      and(eq(sites.ownerId, ownerId), sql`tags is not null and tags != ''`),
+    );
   const tagSet = new Set<string>();
   for (const row of rows) {
     if (!row.tags) continue;

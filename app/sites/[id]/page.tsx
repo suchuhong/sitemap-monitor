@@ -9,13 +9,12 @@ import {
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { getSiteDetail } from "@/lib/logic/site-detail";
 import { formatDate, formatDateTime } from "@/lib/datetime";
+import { requireUser } from "@/lib/auth/session";
 import { SiteActionsPanel } from "./_components/site-actions";
 import { ConfirmScan } from "./_components/ConfirmScan";
 import { ScanTrendChart, type ScanPoint } from "./_components/scan-trend-chart";
 
 export const dynamic = "force-dynamic";
-
-const DEMO_OWNER_ID = "demo-user";
 
 export default async function SiteDetailPage({
   params,
@@ -23,7 +22,8 @@ export default async function SiteDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const detail = await getSiteDetail({ siteId: id, ownerId: DEMO_OWNER_ID, scansLimit: 20 });
+  const user = await requireUser();
+  const detail = await getSiteDetail({ siteId: id, ownerId: user.id, scansLimit: 20 });
   if (!detail) notFound();
 
   const { site, sitemaps, summary, recentScans, recentChanges } = detail;

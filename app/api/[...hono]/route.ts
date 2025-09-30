@@ -1,26 +1,35 @@
+import { randomUUID } from "crypto";
 import { Hono } from "hono";
 import { handle } from "hono/vercel";
+import { getCookie } from "hono/cookie";
 import { z } from "zod";
 import { discover, rediscoverSite } from "@/lib/logic/discover";
-import { scanSite, cronScan } from "@/lib/logic/scan";
+import { enqueueScan, cronScan } from "@/lib/logic/scan";
 import { getSiteDetail } from "@/lib/logic/site-detail";
 import { db } from "@/lib/db";
 import { users, sites, changes, sitemaps, urls, scans, webhooks } from "@/lib/drizzle/schema";
 import { desc, and, eq, gte, lte } from "drizzle-orm";
+import { SESSION_COOKIE_NAME } from "@/lib/auth/session";
 import type { SQL } from "drizzle-orm";
 
 export const config = { runtime: "nodejs" };
 
 const app = new Hono<{ Variables: { userId: string } }>().basePath("/api");
 
-// naive auth stub
 app.use("*", async (c, next) => {
-  const userId = "demo-user";
-  await db
-    .insert(users)
-    .values({ id: userId, email: `${userId}@example.com` })
-    .onConflictDoNothing();
-  c.set("userId", userId);
+  const sessionId = getCookie(c, SESSION_COOKIE_NAME);
+  if (!sessionId) return c.json({ error: "unauthorized" }, 401);
+
+  const [user] = await db
+    .select({ id: users.id, email: users.email })
+    .from(users)
+    .where(eq(users.id, sessionId))
+    .limit(1);
+
+  if (!user) return c.json({ error: "unauthorized" }, 401);
+
+  c.set("userId", user.id);
+  c.set("userEmail", user.email);
   await next();
 });
 
@@ -156,6 +165,7 @@ function normalizeTagsList(tags?: string[]) {
 }
 
 app.get("/sites/export.csv", async (c) => {
+  const ownerId = c.get("userId");
   const rows = await db
     .select({
       id: sites.id,
@@ -164,6 +174,7 @@ app.get("/sites/export.csv", async (c) => {
       createdAt: sites.createdAt,
     })
     .from(sites)
+    .where(eq(sites.ownerId, ownerId))
     .orderBy(desc(sites.createdAt));
   const csv = ["id,rootUrl,robotsUrl,createdAt"]
     .concat(
@@ -192,8 +203,15 @@ app.get("/sites/:id", async (c) => {
 
 app.post("/sites/:id/scan", async (c) => {
   const id = c.req.param("id");
-  const r = await scanSite(id);
-  return c.json(r);
+  const ownerId = c.get("userId");
+  const [site] = await db
+    .select({ id: sites.id })
+    .from(sites)
+    .where(and(eq(sites.id, id), eq(sites.ownerId, ownerId)))
+    .limit(1);
+  if (!site) return c.json({ error: "not found" }, 404);
+  const { scanId } = await enqueueScan(id);
+  return c.json({ ok: true, status: "queued", scanId });
 });
 
 app.post("/cron/scan", async (c) => {
@@ -225,19 +243,31 @@ app.post("/sites/:id/webhooks", async (c) => {
     if (typeof form.secret === "string") secret = form.secret;
   }
   if (!targetUrl) return c.json({ error: "targetUrl required" }, 400);
-  // Upsert webhook
-  const { db } = await import("@/lib/db");
-  const { webhooks } = await import("@/lib/drizzle/schema");
-  const { randomUUID } = await import("crypto");
+  const siteId = c.req.param("id");
+  const ownerId = c.get("userId");
+  const [site] = await db
+    .select({ id: sites.id })
+    .from(sites)
+    .where(and(eq(sites.id, siteId), eq(sites.ownerId, ownerId)))
+    .limit(1);
+  if (!site) return c.json({ error: "not found" }, 404);
   await db
     .insert(webhooks)
-    .values({ id: randomUUID(), siteId: c.req.param("id"), targetUrl, secret });
+    .values({ id: randomUUID(), siteId, targetUrl, secret });
   return c.json({ ok: true });
 });
 
 app.post("/sites/:id/test-webhook", async (c) => {
   const { notifyChange } = await import("@/lib/logic/notify");
-  await notifyChange(c.req.param("id"), {
+  const siteId = c.req.param("id");
+  const ownerId = c.get("userId");
+  const [site] = await db
+    .select({ id: sites.id })
+    .from(sites)
+    .where(and(eq(sites.id, siteId), eq(sites.ownerId, ownerId)))
+    .limit(1);
+  if (!site) return c.json({ error: "not found" }, 404);
+  await notifyChange(siteId, {
     scanId: "test",
     added: 1,
     removed: 0,
@@ -249,6 +279,14 @@ app.post("/sites/:id/test-webhook", async (c) => {
 
 app.get("/sites/:id/changes.csv", async (c) => {
   const id = c.req.param("id");
+  const ownerId = c.get("userId");
+  const [site] = await db
+    .select({ id: sites.id })
+    .from(sites)
+    .where(and(eq(sites.id, id), eq(sites.ownerId, ownerId)))
+    .limit(1);
+  if (!site) return c.body("not found", 404);
+
   const url = new URL(c.req.url);
   const type = url.searchParams.get("type") || "";
   const from = url.searchParams.get("from") || "";
@@ -319,19 +357,39 @@ app.post("/sites/import", async (c) => {
     csv = await file.text();
   }
   if (!csv) return c.json({ error: "no csv provided" }, 400);
-  const { discover } = await import("@/lib/logic/discover");
   const lines = csv
     .split(/\r?\n/)
     .map((s) => s.trim())
     .filter(Boolean);
-  const results = [];
+  const ownerId = c.get("userId");
+  const results: Array<{
+    rootUrl: string;
+    status: "success" | "skipped" | "error";
+    siteId?: string;
+    message?: string;
+  }> = [];
+  let successCount = 0;
   for (const line of lines) {
-    if (!/^https?:\/\//i.test(line)) continue;
+    if (!/^https?:\/\//i.test(line)) {
+      results.push({
+        rootUrl: line,
+        status: "skipped",
+        message: "URL 必须以 http 或 https 开头",
+      });
+      continue;
+    }
     try {
-      results.push(await discover({ rootUrl: line, ownerId: c.get("userId") }));
+      const site = await discover({ rootUrl: line, ownerId });
+      successCount += 1;
+      results.push({ rootUrl: line, status: "success", siteId: site.id });
     } catch (e) {
       console.error("import fail", line, e);
+      results.push({
+        rootUrl: line,
+        status: "error",
+        message: e instanceof Error ? e.message : "导入失败",
+      });
     }
   }
-  return c.json({ ok: true, imported: results.length });
+  return c.json({ ok: true, imported: successCount, results });
 });

@@ -3,10 +3,18 @@
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 
+type ImportRow = {
+  rootUrl: string;
+  status: "success" | "skipped" | "error";
+  siteId?: string;
+  message?: string;
+};
+
 type ImportResult = {
   ok?: boolean;
   imported?: number;
   error?: string;
+  results?: ImportRow[];
 };
 
 export function SiteImportForm() {
@@ -43,7 +51,7 @@ export function SiteImportForm() {
         return;
       }
 
-      setResult({ ok: true, imported: payload.imported ?? 0 });
+      setResult({ ok: true, imported: payload.imported ?? 0, results: payload.results ?? [] });
       // 清空输入，保留文件输入的值需要手动重置
       setCsvText("");
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -88,8 +96,11 @@ export function SiteImportForm() {
       )}
 
       {result?.ok && (
-        <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-600">
-          成功导入 {result.imported ?? 0} 个站点。
+        <div className="space-y-3 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-600">
+          <p>成功导入 {result.imported ?? 0} 个站点。</p>
+          {Boolean(result.results?.length) && (
+            <ImportResultsTable rows={result.results!} />
+          )}
         </div>
       )}
 
@@ -101,4 +112,49 @@ export function SiteImportForm() {
       </div>
     </form>
   );
+}
+
+function ImportResultsTable({ rows }: { rows: ImportRow[] }) {
+  return (
+    <div className="overflow-hidden rounded-md border border-emerald-200 bg-white text-slate-700">
+      <table className="min-w-full text-sm">
+        <thead className="bg-emerald-600/10 text-xs uppercase tracking-wide text-emerald-700">
+          <tr>
+            <th className="px-3 py-2 text-left">站点</th>
+            <th className="px-3 py-2 text-left">状态</th>
+            <th className="px-3 py-2 text-left">说明</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-emerald-100">
+          {rows.map((row) => (
+            <tr key={`${row.rootUrl}-${row.status}`} className="bg-white">
+              <td className="px-3 py-2 font-medium text-slate-800">{row.rootUrl}</td>
+              <td className="px-3 py-2">
+                <StatusBadge status={row.status} />
+              </td>
+              <td className="px-3 py-2 text-slate-600">
+                {row.status === "success" && row.siteId ? `已创建/更新站点 ${row.siteId}` : row.message ?? "—"}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: ImportRow["status"] }) {
+  const map: Record<ImportRow["status"], string> = {
+    success: "inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700",
+    skipped: "inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700",
+    error: "inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-700",
+  };
+
+  const label: Record<ImportRow["status"], string> = {
+    success: "成功",
+    skipped: "跳过",
+    error: "失败",
+  };
+
+  return <span className={map[status]}>{label[status]}</span>;
 }

@@ -251,6 +251,8 @@ Sitemap Monitor 是一个基于 Next.js 15 的示例项目，用于接入站点�
 - UI 引入了 Radix Slot、shadcn 风格组件，如需二次开发可查看 `components/ui`。
 - `lib/datetime.ts` 提供 `formatDate` / `formatDateTime` 等工具，所有时间展示统一为 `YYYY-MM-DD HH:mm[:ss]`。
 - 如果需要运行 ESLint，Next.js 15 会提示迁移脚本，可按向导执行或手动改为直接使用 `eslint` CLI。
+- 未来功能拓展建议可参考 `docs/roadmap.md`，按阶段规划后续迭代。
+- 阶段 1 新增能力（登录、队列、批量导入反馈等）的使用说明见 `docs/stage-one-guide.md`。
 
 ## 下一步建议
 

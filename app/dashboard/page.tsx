@@ -4,20 +4,24 @@ import { Button } from "@/components/ui/button";
 import { db } from "@/lib/db";
 import { sites, changes, scans } from "@/lib/drizzle/schema";
 import { sql, gte, desc, eq, and } from "drizzle-orm";
+import { requireUser } from "@/lib/auth/session";
 
 export default async function Page() {
+  const user = await requireUser();
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
   const [siteRow] = await db
     .select({ value: sql<number>`count(*)` })
-    .from(sites);
+    .from(sites)
+    .where(eq(sites.ownerId, user.id));
   const [{ added = 0, removed = 0 } = {}] = await db
     .select({
       added: sql<number>`sum(case when ${changes.type} = 'added' then 1 else 0 end)`,
       removed: sql<number>`sum(case when ${changes.type} = 'removed' then 1 else 0 end)`,
     })
     .from(changes)
-    .where(gte(changes.occurredAt, since));
+    .innerJoin(sites, eq(changes.siteId, sites.id))
+    .where(and(eq(sites.ownerId, user.id), gte(changes.occurredAt, since)));
 
   const [{ total = 0, failed = 0, duration = 0 } = {}] = await db
     .select({
@@ -26,7 +30,8 @@ export default async function Page() {
       duration: sql<number>`avg(case when ${scans.finishedAt} is not null then (cast(${scans.finishedAt} as integer) - cast(${scans.startedAt} as integer)) else null end)`,
     })
     .from(scans)
-    .where(gte(scans.startedAt, since));
+    .innerJoin(sites, eq(scans.siteId, sites.id))
+    .where(and(eq(sites.ownerId, user.id), gte(scans.startedAt, since)));
 
   const topSites = await db
     .select({
@@ -39,6 +44,7 @@ export default async function Page() {
       scans,
       and(eq(scans.siteId, sites.id), gte(scans.startedAt, since)),
     )
+    .where(eq(sites.ownerId, user.id))
     .groupBy(sites.id)
     .orderBy(desc(sql`count(${scans.id})`))
     .limit(5);

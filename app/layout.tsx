@@ -3,6 +3,8 @@ import Link from "next/link";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Toaster } from "@/components/ui/sonner";
+import { getCurrentUser } from "@/lib/auth/session";
+import { SignOutButton } from "@/components/auth/sign-out-button";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -59,11 +61,13 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const user = await getCurrentUser();
+
   return (
     <html lang="zh-CN" suppressHydrationWarning>
       <body className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
@@ -71,7 +75,7 @@ export default function RootLayout({
           <div className="flex min-h-screen flex-col">
             <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/60" role="banner">
               <div className="container flex h-16 items-center justify-between">
-                <Link href="/" className="flex items-center space-x-2" aria-label="返回首页">
+                <Link href={user ? "/dashboard" : "/"} className="flex items-center space-x-2" aria-label="返回首页">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground" aria-hidden="true">
                     <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
@@ -85,35 +89,55 @@ export default function RootLayout({
                   </div>
                 </Link>
                 <nav className="flex items-center space-x-6" role="navigation" aria-label="主导航">
-                  <Link
-                    className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary hover:underline underline-offset-4"
-                    href="/sites"
-                    aria-label="站点管理页面"
-                  >
-                    站点管理
-                  </Link>
-                  <Link
-                    className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary hover:underline underline-offset-4"
-                    href="/dashboard"
-                    aria-label="数据面板页面"
-                  >
-                    数据面板
-                  </Link>
-                  <Link
-                    className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary hover:underline underline-offset-4"
-                    href="/blog"
-                    aria-label="SEO优化博客"
-                  >
-                    博客
-                  </Link>
-                  <Link
-                    className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary hover:underline underline-offset-4"
-                    href="/faq"
-                    aria-label="常见问题页面"
-                  >
-                    FAQ
-                  </Link>
+                  {user ? (
+                    <>
+                      <Link
+                        className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary hover:underline underline-offset-4"
+                        href="/sites"
+                        aria-label="站点管理页面"
+                      >
+                        站点管理
+                      </Link>
+                      <Link
+                        className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary hover:underline underline-offset-4"
+                        href="/dashboard"
+                        aria-label="数据面板页面"
+                      >
+                        数据面板
+                      </Link>
+                      <Link
+                        className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary hover:underline underline-offset-4"
+                        href="/blog"
+                        aria-label="SEO优化博客"
+                      >
+                        博客
+                      </Link>
+                      <Link
+                        className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary hover:underline underline-offset-4"
+                        href="/faq"
+                        aria-label="常见问题页面"
+                      >
+                        FAQ
+                      </Link>
+                    </>
+                  ) : (
+                    <Link
+                      className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary hover:underline underline-offset-4"
+                      href="/login"
+                      aria-label="登录到控制台"
+                    >
+                      登录
+                    </Link>
+                  )}
                   <ThemeToggle />
+                  {user ? (
+                    <div className="flex items-center gap-3">
+                      <span className="hidden text-xs text-muted-foreground sm:inline">
+                        {user.email}
+                      </span>
+                      <SignOutButton />
+                    </div>
+                  ) : null}
                 </nav>
               </div>
             </header>
