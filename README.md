@@ -2,6 +2,21 @@
 
 Sitemap Monitor 是一个基于 Next.js 15 的示例项目，用于接入站点并持续监控 sitemap 变更。项目整合了 Drizzle ORM、LibSQL/SQLite、本地队列与 Webhook 通知等能力，展示了从前端到 API 的完整链路。
 
+## 目录
+
+- [功能概览](#功能概览)
+- [技术栈](#技术栈)
+- [环境要求](#环境要求)
+- [快速开始](#快速开始)
+- [主要页面](#主要页面)
+- [主要脚本](#主要脚本)
+- [Dashboard 数据](#dashboard-数据)
+- [批量导入指南](#批量导入指南)
+- [API 说明](#api-说明)
+- [数据库结构](#数据库结构)
+- [开发提示](#开发提示)
+- [下一步建议](#下一步建议)
+
 ## 功能概览
 
 - **站点接入/管理**：在 `/sites/new` 提交根地址，列表中可直接启用/禁用、删除站点。
@@ -10,6 +25,8 @@ Sitemap Monitor 是一个基于 Next.js 15 的示例项目，用于接入站点�
 - **站点详情视图**：`/sites/:id` 页面展示 sitemap 列表、最新扫描与变更汇总。
 - **Webhook 通知**：`notifyChange` 会生成签名，实际项目可扩展为发布到外部回调。
 - **Dashboard**：`/dashboard` 直接读取数据库统计站点数量、24h 变更与扫描失败率。
+- **批量导入工具**：`/sites/import` 支持粘贴 CSV 或上传文件批量创建站点。
+- **样式指南**：`/styleguide` 展示项目内使用的按钮、表单、空状态等组件，便于复用。
 
 ## 技术栈
 
@@ -61,7 +78,18 @@ Sitemap Monitor 是一个基于 Next.js 15 的示例项目，用于接入站点�
    ```bash
    pnpm dev
    ```
-   打开 <http://localhost:3000> 体验页面。
+ 打开 <http://localhost:3000> 体验页面。
+
+- 默认演示账号为 `demo-user`，无需额外登录流程，接口层会在首次请求时自动创建。
+
+## 主要页面
+
+- `/dashboard`：概览最近 24 小时关键指标，提供快捷入口。
+- `/sites`：站点列表、排序筛选、标签过滤以及批量导入/导出按钮。
+- `/sites/new`：单个站点接入向导。
+- `/sites/import`：批量导入工具（详见下文指南）。
+- `/sites/:id`：站点详情（sitemap 列表、扫描记录、变更时间线）。
+- `/styleguide`：UI 组件示例页，方便在实际页面中保持视觉一致性。
 
 ## 主要脚本
 
@@ -74,6 +102,20 @@ Sitemap Monitor 是一个基于 Next.js 15 的示例项目，用于接入站点�
 | `pnpm db:generate` | 基于 `lib/drizzle/schema.ts` 生成迁移                         |
 | `pnpm db:migrate`  | 应用迁移到 `DB_URL` 指定的数据库                              |
 | `pnpm db:studio`   | 打开 Drizzle Studio（数据库可视化）                           |
+
+## 批量导入指南
+
+1. 打开 `/sites/import`，可选择以下任一方式准备数据：
+   - **粘贴 CSV 文本**：每行一个站点根地址，例如：
+     ```
+     https://example.com
+     https://foo.bar
+     ```
+   - **上传 CSV 文件**：首列视为 `rootUrl`，其余列会被忽略。
+2. 点击 “开始导入”，页面会通过 Fetch 调用 `/api/sites/import`，并实时展示成功数量或错误信息。
+3. 导入成功后，表单会清空输入内容，可直接返回 `/sites` 查看新站点是否已入库。
+
+> API 会自动忽略空行、无效 URL，并在失败时返回 JSON 错误信息。日志可在终端中查看（`import fail`）。
 
 ## Dashboard 数据
 
@@ -207,6 +249,7 @@ Sitemap Monitor 是一个基于 Next.js 15 的示例项目，用于接入站点�
 - `lib/logic/discover.ts` 与 `lib/logic/scan.ts` 使用全局 `XMLParser` 实例解析 XML，避免 ESM 默认导入 API 变更导致报错。
 - 所有网络请求通过 `fetchWithCompression`，包含 gzip/deflate/br 与超时控制，可按需扩展重试逻辑。
 - UI 引入了 Radix Slot、shadcn 风格组件，如需二次开发可查看 `components/ui`。
+- `lib/datetime.ts` 提供 `formatDate` / `formatDateTime` 等工具，所有时间展示统一为 `YYYY-MM-DD HH:mm[:ss]`。
 - 如果需要运行 ESLint，Next.js 15 会提示迁移脚本，可按向导执行或手动改为直接使用 `eslint` CLI。
 
 ## 下一步建议

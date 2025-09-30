@@ -8,6 +8,8 @@ import {
 } from "@/components/data/sites-table-ssr";
 import { SitesApiPanel } from "./_components/api-panel";
 import { TagFilter } from "./_components/tag-filter";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const dynamic = "force-dynamic";
 
@@ -88,23 +90,93 @@ export default async function SitesPage({
   const availableTags = await fetchDistinctTags();
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">站点列表</h1>
-        <div className="text-sm space-x-4">
-          <Link href="/sites/new" className="underline">
-            新增站点
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">站点管理</h1>
+          <p className="text-muted-foreground">管理和监控您的网站地图</p>
+        </div>
+        <div className="flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-2">
+          <Link href="/sites/new">
+            <Button className="w-full sm:w-auto hover-lift">
+              <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              新增站点
+            </Button>
           </Link>
-          <Link href="/sites/import" className="underline">
-            批量导入
+          <Link href="/sites/import">
+            <Button variant="outline" className="w-full sm:w-auto hover-lift">
+              <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+              </svg>
+              批量导入
+            </Button>
           </Link>
-          <a href="/api/sites/export.csv" className="underline">
-            导出 CSV
+          <a href="/api/sites/export.csv">
+            <Button variant="outline" className="w-full sm:w-auto hover-lift">
+              <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              导出 CSV
+            </Button>
           </a>
         </div>
       </div>
+
+      {/* Stats Cards */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="hover-lift">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">总站点数</CardTitle>
+            <svg className="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9" />
+            </svg>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{total}</div>
+            <p className="text-xs text-muted-foreground">
+              正在监控的站点
+            </p>
+          </CardContent>
+        </Card>
+        
+        <Card className="hover-lift">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">当前页面</CardTitle>
+            <svg className="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{rows.length}</div>
+            <p className="text-xs text-muted-foreground">
+              显示 {rows.length} / {total} 条记录
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="hover-lift">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">可用标签</CardTitle>
+            <svg className="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+            </svg>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{availableTags.length}</div>
+            <p className="text-xs text-muted-foreground">
+              不同的标签类型
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Filters */}
       <TagFilter availableTags={availableTags} />
 
+      {/* Table */}
       <SitesTableSSR
         data={rows}
         sort={sort}
@@ -114,6 +186,7 @@ export default async function SitesPage({
         total={total}
       />
 
+      {/* API Panel */}
       <SitesApiPanel />
     </div>
   );

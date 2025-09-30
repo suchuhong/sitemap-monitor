@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { StatusIndicator } from "@/components/ui/status-indicator";
+import { EmptyState } from "@/components/ui/empty-state";
+import { formatDate, formatTime } from "@/lib/datetime";
 
 export type SitesTableRow = {
   id: string;
@@ -32,103 +35,189 @@ export function SitesTableSSR({
   const lastPage = Math.max(1, Math.ceil(total / pageSize));
 
   return (
-    <div className="space-y-3">
-      <div className="overflow-x-auto rounded-xl border">
-        <table className="w-full text-sm">
-          <thead className="[&_tr]:border-b">
-            <tr>
-              <th className="h-10 px-2 text-left">
-                <a
-                  className="inline-flex items-center gap-1"
-                  href={`/sites?page=1&pageSize=${pageSize}&sort=rootUrl&dir=${nextDir("rootUrl")}`}
+    <div className="space-y-6">
+      <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-muted/50">
+                <th className="h-12 px-4 text-left font-medium text-muted-foreground">
+                  <a
+                    className="inline-flex items-center gap-2 hover:text-foreground transition-colors"
+                    href={`/sites?page=1&pageSize=${pageSize}&sort=rootUrl&dir=${nextDir("rootUrl")}`}
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9" />
+                    </svg>
+                    站点地址 {sortIcon("rootUrl")}
+                  </a>
+                </th>
+                <th className="h-12 px-4 text-left font-medium text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    robots.txt
+                  </div>
+                </th>
+                <th className="h-12 px-4 text-left font-medium text-muted-foreground">
+                  <a
+                    className="inline-flex items-center gap-2 hover:text-foreground transition-colors"
+                    href={`/sites?page=1&pageSize=${pageSize}&sort=createdAt&dir=${nextDir("createdAt")}`}
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    创建时间 {sortIcon("createdAt")}
+                  </a>
+                </th>
+                <th className="h-12 px-4 text-left font-medium text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    状态
+                  </div>
+                </th>
+                <th className="h-12 px-4 text-left font-medium text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                    </svg>
+                    标签
+                  </div>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((r, index) => (
+                <tr
+                  key={r.id}
+                  className="border-b last:border-0 hover:bg-muted/50 transition-colors"
                 >
-                  站点 {sortIcon("rootUrl")}
-                </a>
-              </th>
-              <th className="h-10 px-2 text-left">robots.txt</th>
-              <th className="h-10 px-2 text-left">
-                <a
-                  className="inline-flex items-center gap-1"
-                  href={`/sites?page=1&pageSize=${pageSize}&sort=createdAt&dir=${nextDir("createdAt")}`}
-                >
-                  创建时间 {sortIcon("createdAt")}
-                </a>
-              </th>
-              <th className="h-10 px-2 text-left">状态</th>
-              <th className="h-10 px-2 text-left">标签</th>
-            </tr>
-          </thead>
-          <tbody className="[&_tr:last-child]:border-0">
-            {data.map((r) => (
-              <tr
-                key={r.id}
-                className="border-b hover:bg-slate-50 dark:hover:bg-slate-900"
-              >
-                <td className="p-2">
-                  <Link className="underline" href={`/sites/${r.id}`}>
-                    {r.rootUrl}
-                  </Link>
-                </td>
-                <td className="p-2">{r.robotsUrl ?? "—"}</td>
-                <td className="p-2">
-                  {r.createdAt
-                    ? new Date(Number(r.createdAt) * 1000).toLocaleString()
-                    : "—"}
-                </td>
-                <td className="p-2">
-                  {r.enabled ? (
-                    <span className="text-emerald-600 dark:text-emerald-400">启用</span>
-                  ) : (
-                    <span className="text-slate-500">禁用</span>
-                  )}
-                </td>
-                <td className="p-2">
-                  {parseTags(r.tags).length ? (
-                    <div className="flex flex-wrap gap-1 text-xs">
-                      {parseTags(r.tags).map((tag) => (
-                        <span
-                          key={tag}
-                          className="inline-flex items-center rounded-full bg-blue-50 px-2 py-1 text-blue-600 dark:bg-blue-900/40 dark:text-blue-200"
+                  <td className="p-4">
+                    <div className="flex items-center space-x-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary text-xs font-bold">
+                        {index + 1}
+                      </div>
+                      <div>
+                        <Link 
+                          className="font-medium text-primary hover:underline underline-offset-4" 
+                          href={`/sites/${r.id}`}
                         >
-                          {tag}
-                        </span>
-                      ))}
+                          {r.rootUrl}
+                        </Link>
+                        <p className="text-xs text-muted-foreground mt-1">ID: {r.id}</p>
+                      </div>
                     </div>
-                  ) : (
-                    <span className="text-slate-400">—</span>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {data.length === 0 && (
-              <tr>
-                <td className="p-4 text-slate-500" colSpan={5}>
-                  暂无数据
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+                  </td>
+                  <td className="p-4">
+                    {r.robotsUrl ? (
+                      <a 
+                        href={r.robotsUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-sm text-success hover:underline"
+                      >
+                        <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                        查看
+                      </a>
+                    ) : (
+                      <span className="text-muted-foreground">未找到</span>
+                    )}
+                  </td>
+                  <td className="p-4">
+                    {formatDate(r.createdAt) === "—" ? (
+                      <span className="text-muted-foreground">—</span>
+                    ) : (
+                      <div>
+                        <div className="font-medium">{formatDate(r.createdAt)}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {formatTime(r.createdAt, { includeSeconds: true })}
+                        </div>
+                      </div>
+                    )}
+                  </td>
+                  <td className="p-4">
+                    <StatusIndicator status={r.enabled ? "success" : "pending"}>
+                      {r.enabled ? "启用中" : "已禁用"}
+                    </StatusIndicator>
+                  </td>
+                  <td className="p-4">
+                    {parseTags(r.tags).length ? (
+                      <div className="flex flex-wrap gap-1">
+                        {parseTags(r.tags).slice(0, 3).map((tag) => (
+                          <span
+                            key={tag}
+                            className="inline-flex items-center rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                        {parseTags(r.tags).length > 3 && (
+                          <span className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
+                            +{parseTags(r.tags).length - 3}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">无标签</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {data.length === 0 && (
+                <tr>
+                  <td className="p-0" colSpan={5}>
+                    <EmptyState
+                      title="暂无站点数据"
+                      description="开始添加您的第一个站点进行监控"
+                      action={{
+                        label: "添加站点",
+                        href: "/sites/new"
+                      }}
+                    />
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      <div className="flex items-center justify-between text-sm">
-        <div className="text-slate-600">
-          共 {total} 条，{page}/{lastPage} 页
+      {/* Pagination */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+          <span>共 {total} 条记录</span>
+          <span>•</span>
+          <span>第 {page} 页，共 {lastPage} 页</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center space-x-2">
           <a
             aria-disabled={page <= 1}
-            className={`h-8 px-3 rounded-md border ${page <= 1 ? "pointer-events-none opacity-50" : ""}`}
+            className={`inline-flex items-center justify-center h-9 px-4 rounded-md border text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground ${
+              page <= 1 ? "pointer-events-none opacity-50" : ""
+            }`}
             href={`/sites?page=${page - 1}&pageSize=${pageSize}&sort=${sort}&dir=${dir}`}
           >
+            <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
             上一页
           </a>
           <a
             aria-disabled={page >= lastPage}
-            className={`h-8 px-3 rounded-md border ${page >= lastPage ? "pointer-events-none opacity-50" : ""}`}
+            className={`inline-flex items-center justify-center h-9 px-4 rounded-md border text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground ${
+              page >= lastPage ? "pointer-events-none opacity-50" : ""
+            }`}
             href={`/sites?page=${page + 1}&pageSize=${pageSize}&sort=${sort}&dir=${dir}`}
           >
             下一页
+            <svg className="ml-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
           </a>
         </div>
       </div>

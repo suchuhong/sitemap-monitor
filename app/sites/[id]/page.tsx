@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/card";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { getSiteDetail } from "@/lib/logic/site-detail";
+import { formatDate, formatDateTime } from "@/lib/datetime";
 import { SiteActionsPanel } from "./_components/site-actions";
 import { ConfirmScan } from "./_components/ConfirmScan";
 import { ScanTrendChart, type ScanPoint } from "./_components/scan-trend-chart";
@@ -43,7 +44,7 @@ export default async function SiteDetailPage({
           ← 返回列表
         </Link>
         <div className="text-xs text-slate-500">
-          最近更新：{formatDate(site.updatedAt)}
+          最近更新：{formatDateTime(site.updatedAt, { includeSeconds: true })}
         </div>
       </div>
 
@@ -71,7 +72,7 @@ export default async function SiteDetailPage({
             </div>
             <div>
               <span className="text-slate-500">创建时间：</span>
-              {formatDate(site.createdAt)}
+              {formatDateTime(site.createdAt, { includeSeconds: true })}
             </div>
             <div>
               <span className="text-slate-500">状态：</span>
@@ -240,7 +241,7 @@ export default async function SiteDetailPage({
             {recentChanges.map((change) => (
               <div key={change.id} className="rounded-xl border p-3">
                 <div className="flex items-center gap-2 text-xs text-slate-500">
-                  <span>{formatDate(change.occurredAt)}</span>
+                  <span>{formatDateTime(change.occurredAt, { includeSeconds: true })}</span>
                   <Badge variant={changeBadgeVariant(change.type)}>{change.type}</Badge>
                 </div>
                 <div className="mt-2 break-words text-sm">{change.detail ?? "—"}</div>
@@ -251,20 +252,6 @@ export default async function SiteDetailPage({
       </div>
     </div>
   );
-}
-
-function formatDate(value: unknown) {
-  const date = coerceDate(value);
-  return date ? date.toLocaleString() : "—";
-}
-
-function coerceDate(value: unknown) {
-  if (!value) return null;
-  if (value instanceof Date) return value;
-  const num = Number(value);
-  if (!Number.isFinite(num)) return null;
-  const millis = num > 1e12 ? num : num * 1000;
-  return new Date(millis);
 }
 
 function normalizeToMillis(value: unknown) {

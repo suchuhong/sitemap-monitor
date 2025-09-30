@@ -18,6 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from "./table-primitive";
+import { formatDateTime } from "@/lib/datetime";
 
 type Site = {
   id: string;
@@ -49,9 +50,7 @@ const columns: ColumnDef<Site>[] = [
     accessorKey: "createdAt",
     header: "创建时间",
     cell: ({ getValue }) => {
-      const value = getValue();
-      const date = coerceDate(value);
-      return <span>{date ? date.toLocaleString() : "—"}</span>;
+      return <span>{formatDateTime(getValue(), { includeSeconds: true })}</span>;
     },
   },
   {
@@ -192,13 +191,4 @@ export function SitesTable({ data }: { data: Site[] }) {
 // Minimal table primitives styled with Tailwind
 export function TableWrapper({ children }: { children: React.ReactNode }) {
   return <div className="overflow-x-auto">{children}</div>;
-}
-
-function coerceDate(value: unknown) {
-  if (!value) return null;
-  if (value instanceof Date) return value;
-  const num = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(num)) return null;
-  const millis = num > 1e12 ? num : num * 1000;
-  return new Date(millis);
 }
