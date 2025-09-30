@@ -13,6 +13,9 @@ export type SitesTableRow = {
   scanPriority?: number | null;
   scanIntervalMinutes?: number | null;
   lastScanAt?: Date | number | null;
+  groupId?: string | null;
+  groupName?: string | null;
+  groupColor?: string | null;
 };
 
 export function SitesTableSSR({
@@ -88,6 +91,14 @@ export function SitesTableSSR({
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     状态
+                  </div>
+                </th>
+                <th className="h-12 px-4 text-left font-medium text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7h18M3 12h10M3 17h7" />
+                    </svg>
+                    分组
                   </div>
                 </th>
                 <th className="h-12 px-4 text-left font-medium text-muted-foreground">
@@ -171,6 +182,18 @@ export function SitesTableSSR({
                     </StatusIndicator>
                   </td>
                   <td className="p-4">
+                    {r.groupName ? (
+                      <span
+                        className="inline-flex items-center rounded-md border px-2 py-1 text-xs"
+                        style={r.groupColor ? { borderColor: r.groupColor, color: r.groupColor } : undefined}
+                      >
+                        {r.groupName}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">未分组</span>
+                    )}
+                  </td>
+                  <td className="p-4">
                     {parseTags(r.tags).length ? (
                       <div className="flex flex-wrap gap-1">
                         {parseTags(r.tags).slice(0, 3).map((tag) => (
@@ -195,7 +218,7 @@ export function SitesTableSSR({
               ))}
               {data.length === 0 && (
                 <tr>
-                  <td className="p-0" colSpan={6}>
+                  <td className="p-0" colSpan={7}>
                     <EmptyState
                       title="暂无站点数据"
                       description="开始添加您的第一个站点进行监控"

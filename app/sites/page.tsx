@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { sites } from "@/lib/drizzle/schema";
+import { sites, siteGroups } from "@/lib/drizzle/schema";
 import { requireUser } from "@/lib/auth/session";
 import { sql, asc, desc, and, eq } from "drizzle-orm";
 import {
@@ -9,6 +9,7 @@ import {
 } from "@/components/data/sites-table-ssr";
 import { SitesApiPanel } from "./_components/api-panel";
 import { TagFilter } from "./_components/tag-filter";
+import { GroupFilter } from "./_components/group-filter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -67,6 +68,7 @@ export default async function SitesPage({
     .split(",")
     .map((tag) => tag.trim())
     .filter(Boolean);
+  const groupParam = getParam(params, "group", "");
 
   const page = getInt(params, "page", 1);
   const pageSize = Math.min(getInt(params, "pageSize", 10), 50);
@@ -82,7 +84,8 @@ export default async function SitesPage({
   const tagWhere = selectedTags.length ? buildTagsWhereClause(selectedTags) : undefined;
 
   const ownerCondition = eq(sites.ownerId, user.id);
-  const combinedWhere = tagWhere ? and(ownerCondition, tagWhere) : ownerCondition;
+  let combinedWhere = tagWhere ? and(ownerCondition, tagWhere) : ownerCondition;
+  if (groupParam) combinedWhere = and(combinedWhere, eq(sites.groupId, groupParam));
 
   const [{ count = 0 } = {}] = await db
     .select({ count: sql<number>`count(*)` })
@@ -102,14 +105,21 @@ export default async function SitesPage({
       scanIntervalMinutes: sites.scanIntervalMinutes,
       lastScanAt: sites.lastScanAt,
       createdAt: sites.createdAt,
+      groupId: sites.groupId,
+      groupName: siteGroups.name,
+      groupColor: siteGroups.color,
     })
     .from(sites)
+    .leftJoin(siteGroups, eq(siteGroups.id, sites.groupId))
     .orderBy(orderByClause)
     .limit(pageSize)
     .offset(offset);
   const rows = (await rowsQuery.where(combinedWhere)) as SitesTableRow[];
 
-  const availableTags = await fetchDistinctTags(user.id);
+  const [availableTags, availableGroups] = await Promise.all([
+    fetchDistinctTags(user.id),
+    fetchGroups(user.id),
+  ]);
 
   return (
     <div className="space-y-8">
@@ -134,6 +144,22 @@ export default async function SitesPage({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
               </svg>
               批量导入
+            </Button>
+          </Link>
+          <Link href="/sites/groups">
+            <Button variant="outline" className="w-full sm:w-auto hover-lift">
+              <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7h18M3 12h10M3 17h7" />
+              </svg>
+              分组管理
+            </Button>
+          </Link>
+          <Link href="/sites/bulk">
+            <Button variant="outline" className="w-full sm:w-auto hover-lift">
+              <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+              批量操作
             </Button>
           </Link>
           <a href="/api/sites/export.csv">
@@ -193,10 +219,25 @@ export default async function SitesPage({
             </p>
           </CardContent>
         </Card>
+        <Card className="hover-lift">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">站点分组</CardTitle>
+            <svg className="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7h18M3 12h10M3 17h7" />
+            </svg>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{availableGroups.length}</div>
+            <p className="text-xs text-muted-foreground">不同的站点分组</p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Filters */}
-      <TagFilter availableTags={availableTags} />
+      <div className="space-y-4">
+        <TagFilter availableTags={availableTags} />
+        <GroupFilter availableGroups={availableGroups} activeGroup={groupParam} />
+      </div>
 
       {/* Table */}
       <SitesTableSSR
@@ -240,4 +281,13 @@ function buildTagsWhereClause(tags: string[]) {
   return and(
     ...tags.map((tag) => sql`${sites.tags} LIKE ${`%"${tag}"%`}`),
   );
+}
+
+async function fetchGroups(ownerId: string) {
+  const rows = await db
+    .select({ id: siteGroups.id, name: siteGroups.name, color: siteGroups.color })
+    .from(siteGroups)
+    .where(eq(siteGroups.ownerId, ownerId))
+    .orderBy(asc(siteGroups.name));
+  return rows;
 }

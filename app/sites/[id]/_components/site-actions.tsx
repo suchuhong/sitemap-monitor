@@ -13,6 +13,7 @@ type SiteDetailResponse = {
     scanPriority?: number;
     scanIntervalMinutes?: number;
     tags?: string[];
+    groupId?: string | null;
   };
 };
 
@@ -23,6 +24,8 @@ export function SiteActionsPanel({
   initialTags,
   initialPriority,
   initialInterval,
+  initialGroupId,
+  groups,
 }: {
   siteId: string;
   initialRootUrl: string;
@@ -30,6 +33,8 @@ export function SiteActionsPanel({
   initialTags: string[];
   initialPriority: number;
   initialInterval: number;
+  initialGroupId: string;
+  groups: Array<{ id: string; name: string; description?: string | null; color?: string | null }>;
 }) {
   const router = useRouter();
   const initialNormalized = normalizeTagsList(initialTags);
@@ -38,11 +43,13 @@ export function SiteActionsPanel({
   const [baselineTags, setBaselineTags] = useState(initialNormalized);
   const [baselinePriority, setBaselinePriority] = useState(initialPriority);
   const [baselineInterval, setBaselineInterval] = useState(initialInterval);
+  const [baselineGroupId, setBaselineGroupId] = useState(initialGroupId);
   const [rootUrl, setRootUrl] = useState(initialRootUrl);
   const [enabled, setEnabled] = useState(initialEnabled);
   const [tags, setTags] = useState(initialNormalized);
   const [scanPriority, setScanPriority] = useState(initialPriority);
   const [scanInterval, setScanInterval] = useState(initialInterval);
+  const [groupId, setGroupId] = useState(initialGroupId);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -57,7 +64,8 @@ export function SiteActionsPanel({
       enabled !== baselineEnabled ||
       tagsChanged ||
       scanPriority !== baselinePriority ||
-      scanInterval !== baselineInterval
+      scanInterval !== baselineInterval ||
+      groupId !== baselineGroupId
     );
   }, [
     rootUrl,
@@ -70,6 +78,8 @@ export function SiteActionsPanel({
     baselinePriority,
     scanInterval,
     baselineInterval,
+    groupId,
+    baselineGroupId,
   ]);
 
   const handleSave = async () => {
@@ -86,6 +96,7 @@ export function SiteActionsPanel({
       payload.tags = normalizedTags;
     if (scanPriority !== baselinePriority) payload.scanPriority = scanPriority;
     if (scanInterval !== baselineInterval) payload.scanIntervalMinutes = scanInterval;
+    if (groupId !== baselineGroupId) payload.groupId = groupId || null;
     if (Object.keys(payload).length === 0) {
       toast.info("没有需要保存的变化");
       return;
@@ -124,6 +135,11 @@ export function SiteActionsPanel({
         setScanInterval(detail.site.scanIntervalMinutes);
         setBaselineInterval(detail.site.scanIntervalMinutes);
       }
+      if (detail?.site?.groupId !== undefined) {
+        const value = detail.site.groupId ?? "";
+        setGroupId(value);
+        setBaselineGroupId(value);
+      }
       toast.success("保存成功");
       router.refresh();
     } catch (err) {
@@ -156,86 +172,109 @@ export function SiteActionsPanel({
   };
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <h3 className="text-base font-semibold">站点设置</h3>
-        <div className="space-y-2 text-sm">
-          <label className="block text-slate-500">根地址</label>
-          <Input value={rootUrl} onChange={(e) => setRootUrl(e.target.value)} />
-        </div>
-        <div className="space-y-2 text-sm">
-          <label className="block text-slate-500">站点标签</label>
-          <TagInput value={tags} onChange={setTags} placeholder="输入标签后回车添加" />
-          <p className="text-xs text-slate-400">可用于列表过滤与分类管理</p>
-        </div>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={enabled}
-            onChange={(e) => setEnabled(e.target.checked)}
-          />
-          <span>启用监控</span>
-        </label>
-        <div className="grid gap-3 md:grid-cols-2">
+    <div className="space-y-4">
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <h3 className="text-base font-semibold">站点设置</h3>
           <div className="space-y-2 text-sm">
-            <label className="block text-slate-500">扫描优先级 (1-5)</label>
-            <Input
-              type="number"
-              min={1}
-              max={5}
-              value={scanPriority}
-              onChange={(event) => setScanPriority(clamp(parseInt(event.target.value, 10), 1, 5))}
-            />
-            <p className="text-xs text-slate-400">数值越高越优先扫描。</p>
+            <label className="block text-slate-500">根地址</label>
+            <Input value={rootUrl} onChange={(e) => setRootUrl(e.target.value)} />
           </div>
           <div className="space-y-2 text-sm">
-            <label className="block text-slate-500">扫描间隔（分钟）</label>
-            <Input
-              type="number"
-              min={5}
-              value={scanInterval}
-              onChange={(event) =>
-                setScanInterval(clamp(parseInt(event.target.value, 10), 5, 10080))
-              }
+            <label className="block text-slate-500">站点标签</label>
+            <TagInput value={tags} onChange={setTags} placeholder="输入标签后回车添加" />
+            <p className="text-xs text-slate-400">可用于列表过滤与分类管理</p>
+          </div>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={enabled}
+              onChange={(e) => setEnabled(e.target.checked)}
             />
-            <p className="text-xs text-slate-400">推荐 15 ~ 1440 分钟，可按站点重要性调整。</p>
+            <span>启用监控</span>
+          </label>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-2 text-sm">
+              <label className="block text-slate-500">扫描优先级 (1-5)</label>
+              <Input
+                type="number"
+                min={1}
+                max={5}
+                value={scanPriority}
+                onChange={(event) => setScanPriority(clamp(parseInt(event.target.value, 10), 1, 5))}
+              />
+              <p className="text-xs text-slate-400">数值越高越优先扫描。</p>
+            </div>
+            <div className="space-y-2 text-sm">
+              <label className="block text-slate-500">扫描间隔（分钟）</label>
+              <Input
+                type="number"
+                min={5}
+                value={scanInterval}
+                onChange={(event) =>
+                  setScanInterval(clamp(parseInt(event.target.value, 10), 5, 10080))
+                }
+              />
+              <p className="text-xs text-slate-400">推荐 15 ~ 1440 分钟，可按站点重要性调整。</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={handleSave} disabled={saving || !dirty}>
+              {saving ? "保存中..." : "保存"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setRootUrl(baselineRoot);
+                setEnabled(baselineEnabled);
+                setTags(baselineTags);
+                setScanPriority(baselinePriority);
+                setScanInterval(baselineInterval);
+                setGroupId(baselineGroupId);
+              }}
+              disabled={saving || (!dirty && !saving)}
+            >
+              重置
+            </Button>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button onClick={handleSave} disabled={saving || !dirty}>
-            {saving ? "保存中..." : "保存"}
-          </Button>
+
+        <div className="space-y-3 rounded-2xl border border-rose-200 bg-rose-50/80 p-4 text-sm shadow-sm dark:border-rose-900/60 dark:bg-rose-950/40">
+          <h3 className="text-base font-semibold text-rose-600 dark:text-rose-200">
+            危险操作
+          </h3>
+          <p className="text-rose-600/90 dark:text-rose-200/90">
+            删除站点会同时移除其关联的 sitemap、URL、扫描记录与变更历史，操作不可恢复。
+          </p>
           <Button
-            type="button"
-            variant="outline"
-            onClick={() => {
-              setRootUrl(baselineRoot);
-              setEnabled(baselineEnabled);
-              setTags(baselineTags);
-              setScanPriority(baselinePriority);
-              setScanInterval(baselineInterval);
-            }}
-            disabled={saving || (!dirty && !saving)}
+            variant="destructive"
+            onClick={handleDelete}
+            disabled={deleting}
           >
-            重置
+            {deleting ? "删除中..." : "删除站点"}
           </Button>
         </div>
       </div>
 
-      <div className="space-y-3 rounded-2xl border border-rose-200 bg-rose-50/80 p-4 text-sm shadow-sm dark:border-rose-900/60 dark:bg-rose-950/40">
-        <h3 className="text-base font-semibold text-rose-600 dark:text-rose-200">
-          危险操作
-        </h3>
-        <p className="text-rose-600/90 dark:text-rose-200/90">
-          删除站点会同时移除其关联的 sitemap、URL、扫描记录与变更历史，操作不可恢复。
-        </p>
-        <Button
-          variant="destructive"
-          onClick={handleDelete}
-          disabled={deleting}
-        >
-          {deleting ? "删除中..." : "删除站点"}
-        </Button>
+      <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <h3 className="text-base font-semibold">分组设置</h3>
+        <div className="space-y-2 text-sm">
+          <label className="block text-slate-500">选择分组</label>
+          <select
+            className="h-9 w-full rounded-md border border-slate-200 bg-background px-2 text-sm"
+            value={groupId}
+            onChange={(event) => setGroupId(event.target.value)}
+          >
+            <option value="">未分组</option>
+            {groups.map((group) => (
+              <option key={group.id} value={group.id}>
+                {group.name}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-slate-400">分组用于批量管理与统计，可在分组管理中新增。</p>
+        </div>
       </div>
     </div>
   );

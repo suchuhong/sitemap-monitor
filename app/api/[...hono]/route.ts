@@ -16,6 +16,7 @@ import {
   scans,
   webhooks,
   notificationChannels,
+  siteGroups,
 } from "@/lib/drizzle/schema";
 import { desc, and, eq, gte, lte } from "drizzle-orm";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/session";
@@ -91,6 +92,7 @@ app.patch("/sites/:id", async (c) => {
       tags: z.array(z.string()).optional(),
       scanPriority: z.number().int().min(1).max(5).optional(),
       scanIntervalMinutes: z.number().int().min(5).max(10080).optional(),
+      groupId: z.string().min(1).optional().nullable(),
     })
     .refine((data) => Object.keys(data).length > 0, {
       message: "no updates provided",
@@ -128,6 +130,20 @@ app.patch("/sites/:id", async (c) => {
   if (body.scanPriority !== undefined) updatePayload.scanPriority = body.scanPriority;
   if (body.scanIntervalMinutes !== undefined)
     updatePayload.scanIntervalMinutes = body.scanIntervalMinutes;
+  if (body.groupId !== undefined) {
+    if (!body.groupId) {
+      updatePayload.groupId = null;
+    } else {
+      const [group] = await db
+        .select({ ownerId: siteGroups.ownerId })
+        .from(siteGroups)
+        .where(eq(siteGroups.id, body.groupId))
+        .limit(1);
+      if (!group || group.ownerId !== ownerId)
+        return c.json({ error: "group not found" }, 404);
+      updatePayload.groupId = body.groupId;
+    }
+  }
   if (Object.keys(updatePayload).length)
     await db
       .update(sites)

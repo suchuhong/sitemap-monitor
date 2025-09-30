@@ -1,5 +1,13 @@
 import { db } from "@/lib/db";
-import { sites, sitemaps, urls, scans, changes, notificationChannels } from "@/lib/drizzle/schema";
+import {
+  sites,
+  sitemaps,
+  urls,
+  scans,
+  changes,
+  notificationChannels,
+  siteGroups,
+} from "@/lib/drizzle/schema";
 import { and, desc, eq, sql } from "drizzle-orm";
 
 type DetailOptions = {
@@ -22,6 +30,7 @@ export async function getSiteDetail({
       robotsUrl: sites.robotsUrl,
       enabled: sites.enabled,
       tags: sites.tags,
+      groupId: sites.groupId,
       scanPriority: sites.scanPriority,
       scanIntervalMinutes: sites.scanIntervalMinutes,
       lastScanAt: sites.lastScanAt,
@@ -95,6 +104,9 @@ export async function getSiteDetail({
       id: changes.id,
       type: changes.type,
       detail: changes.detail,
+      source: changes.source,
+      assignee: changes.assignee,
+      status: changes.status,
       occurredAt: changes.occurredAt,
     })
     .from(changes)
@@ -130,6 +142,7 @@ export async function getSiteDetail({
     recentScans,
     recentChanges,
     notifications: await fetchNotificationChannels(site.id),
+    groups: await fetchGroups(ownerId),
   };
 }
 
@@ -153,5 +166,19 @@ async function fetchNotificationChannels(siteId: string) {
     })
     .from(notificationChannels)
     .where(eq(notificationChannels.siteId, siteId));
+  return rows;
+}
+
+async function fetchGroups(ownerId: string) {
+  const rows = await db
+    .select({
+      id: siteGroups.id,
+      name: siteGroups.name,
+      description: siteGroups.description,
+      color: siteGroups.color,
+    })
+    .from(siteGroups)
+    .where(eq(siteGroups.ownerId, ownerId))
+    .orderBy(desc(siteGroups.createdAt));
   return rows;
 }

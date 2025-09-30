@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "a8286ebf-c73f-4544-9202-3632348b395d",
-  "prevId": "6f25e7aa-50d1-45d2-885c-94c194f5f0d8",
+  "id": "6172ba4b-8839-4781-bd4a-7e7c50db47db",
+  "prevId": "a8286ebf-c73f-4544-9202-3632348b395d",
   "tables": {
     "changes": {
       "name": "changes",
@@ -48,6 +48,28 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "assignee": {
+          "name": "assignee",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": "'open'"
         },
         "occurred_at": {
           "name": "occurred_at",
@@ -276,6 +298,80 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {}
     },
+    "site_groups": {
+      "name": "site_groups",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "color": {
+          "name": "color",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": "(unixepoch())"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": "(unixepoch())"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "site_groups_owner_id_users_id_fk": {
+          "name": "site_groups_owner_id_users_id_fk",
+          "tableFrom": "site_groups",
+          "tableTo": "users",
+          "columnsFrom": [
+            "owner_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
+    },
     "sitemaps": {
       "name": "sitemaps",
       "columns": {
@@ -411,6 +507,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "group_id": {
+          "name": "group_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "scan_priority": {
           "name": "scan_priority",
           "type": "integer",
@@ -459,6 +562,19 @@
           "tableTo": "users",
           "columnsFrom": [
             "owner_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "sites_group_id_site_groups_id_fk": {
+          "name": "sites_group_id_site_groups_id_fk",
+          "tableFrom": "sites",
+          "tableTo": "site_groups",
+          "columnsFrom": [
+            "group_id"
           ],
           "columnsTo": [
             "id"

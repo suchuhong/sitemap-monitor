@@ -15,6 +15,7 @@ import { ConfirmScan } from "./_components/ConfirmScan";
 import { ScanTrendChart, type ScanPoint } from "./_components/scan-trend-chart";
 import { SiteNotificationsPanel } from "./_components/site-notifications";
 import { ScanDiffPanel } from "./_components/scan-diff-panel";
+import { ChangeAssignmentList } from "./_components/change-assignment-list";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +29,7 @@ export default async function SiteDetailPage({
   const detail = await getSiteDetail({ siteId: id, ownerId: user.id, scansLimit: 20 });
   if (!detail) notFound();
 
-  const { site, sitemaps, summary, recentScans, recentChanges, notifications } = detail;
+  const { site, sitemaps, summary, recentScans, recentChanges, notifications, groups } = detail;
   const scanTrendPoints: ScanPoint[] = recentScans
     .filter((scan) => scan?.startedAt)
     .map((scan) => ({
@@ -47,6 +48,8 @@ export default async function SiteDetailPage({
         ? channel.createdAt.getTime()
         : channel.createdAt ?? null,
   }));
+
+  const initialGroupId = site.groupId ?? "";
 
   return (
     <div className="space-y-6">
@@ -92,6 +95,16 @@ export default async function SiteDetailPage({
               <Badge variant={site.enabled ? "added" : "removed"}>
                 {site.enabled ? "已启用" : "已禁用"}
               </Badge>
+            </div>
+            <div>
+              <span className="text-slate-500">所属分组：</span>
+              {site.groupId ? (
+                <Badge variant="outline">
+                  {groups.find((group) => group.id === site.groupId)?.name ?? "—"}
+                </Badge>
+              ) : (
+                <span className="text-slate-400">未分组</span>
+              )}
             </div>
             <div>
               <span className="text-slate-500">扫描优先级：</span>
@@ -155,6 +168,8 @@ export default async function SiteDetailPage({
         initialTags={Array.isArray(site.tags) ? site.tags : []}
         initialPriority={site.scanPriority ?? 1}
         initialInterval={site.scanIntervalMinutes ?? 1440}
+        initialGroupId={initialGroupId}
+        groups={groups}
       />
 
       <SiteNotificationsPanel siteId={site.id} initialChannels={notificationChannels} />
@@ -269,17 +284,19 @@ export default async function SiteDetailPage({
           <CardHeader>
             <CardTitle>最近变更</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            {recentChanges.length === 0 && <div className="text-slate-500">暂无变更</div>}
-            {recentChanges.map((change) => (
-              <div key={change.id} className="rounded-xl border p-3">
-                <div className="flex items-center gap-2 text-xs text-slate-500">
-                  <span>{formatDateTime(change.occurredAt, { includeSeconds: true })}</span>
-                  <Badge variant={changeBadgeVariant(change.type)}>{change.type}</Badge>
-                </div>
-                <div className="mt-2 break-words text-sm">{change.detail ?? "—"}</div>
-              </div>
-            ))}
+          <CardContent>
+            <ChangeAssignmentList
+              siteId={site.id}
+              items={recentChanges.map((change) => ({
+                id: change.id,
+                type: change.type,
+                detail: change.detail,
+                occurredAt: change.occurredAt,
+                source: change.source,
+                assignee: change.assignee,
+                status: change.status,
+              }))}
+            />
           </CardContent>
         </Card>
       </div>
@@ -299,10 +316,4 @@ function statusBadgeVariant(status: string): BadgeProps["variant"] {
   if (status === "success") return "added";
   if (status === "failed") return "removed";
   return "default";
-}
-
-function changeBadgeVariant(type: string): BadgeProps["variant"] {
-  if (type === "added") return "added";
-  if (type === "removed") return "removed";
-  return "updated";
 }

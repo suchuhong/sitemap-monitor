@@ -29,6 +29,9 @@ type ChangeRecord = {
   type: string;
   detail: string | null;
   occurredAt: Date | null;
+  source: string | null;
+  assignee: string | null;
+  status: string | null;
 };
 
 export default async function TasksPage() {
@@ -62,6 +65,9 @@ export default async function TasksPage() {
         type: changes.type,
         detail: changes.detail,
         occurredAt: changes.occurredAt,
+        source: changes.source,
+        assignee: changes.assignee,
+        status: changes.status,
       })
       .from(changes)
       .innerJoin(sites, eq(changes.siteId, sites.id))
@@ -77,6 +83,17 @@ export default async function TasksPage() {
       return acc;
     },
     {} as Record<string, number>,
+  );
+
+  const changeStatusCounts = changeRows.reduce(
+    (acc, change) => {
+      const key = (change.status ?? "open").toLowerCase();
+      if (key === "resolved") acc.resolved += 1;
+      else if (key === "in_progress") acc.inProgress += 1;
+      else acc.open += 1;
+      return acc;
+    },
+    { open: 0, inProgress: 0, resolved: 0 },
   );
 
   return (
@@ -107,6 +124,28 @@ export default async function TasksPage() {
             </CardContent>
           </Card>
         )}
+      </section>
+
+      <section>
+        <Card className="hover-lift">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">变更分派状态</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
+            <div className="flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
+              <span>未处理</span>
+              <span className="font-semibold text-rose-500">{changeStatusCounts.open}</span>
+            </div>
+            <div className="flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
+              <span>处理中</span>
+              <span className="font-semibold text-amber-500">{changeStatusCounts.inProgress}</span>
+            </div>
+            <div className="flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
+              <span>已解决</span>
+              <span className="font-semibold text-emerald-500">{changeStatusCounts.resolved}</span>
+            </div>
+          </CardContent>
+        </Card>
       </section>
 
       <section className="space-y-4">
@@ -199,6 +238,11 @@ export default async function TasksPage() {
                 <StatusIndicator status={statusTone(change.type)}>{statusLabel(change.type)}</StatusIndicator>
                 <span className="text-muted-foreground break-all">{change.detail ?? "—"}</span>
               </div>
+              <div className="mt-1 flex flex-wrap gap-3 text-xs text-muted-foreground">
+                <span>来源：{change.source ?? "—"}</span>
+                <span>处理人：{change.assignee ?? "—"}</span>
+                <span>状态：{statusLabel(change.status)}</span>
+              </div>
             </div>
           ))}
         </div>
@@ -216,6 +260,9 @@ function statusLabel(status?: string | null) {
   if (value === "added") return "新增";
   if (value === "removed") return "删除";
   if (value === "updated") return "更新";
+  if (value === "open") return "未处理";
+  if (value === "in_progress") return "处理中";
+  if (value === "resolved") return "已解决";
   return "未知";
 }
 
@@ -223,7 +270,8 @@ function statusTone(status?: string | null): "success" | "error" | "warning" | "
   const value = (status ?? "").toLowerCase();
   if (value === "success" || value === "added") return "success";
   if (value === "failed" || value === "removed") return "error";
-  if (value === "running" || value === "updated") return "warning";
+  if (value === "running" || value === "updated" || value === "in_progress") return "warning";
+  if (value === "resolved") return "success";
   if (value === "queued") return "info";
   return "pending";
 }

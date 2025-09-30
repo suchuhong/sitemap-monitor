@@ -9,6 +9,18 @@ export const users = sqliteTable("users", {
   ),
 });
 
+export const siteGroups = sqliteTable("site_groups", {
+  id: text("id").primaryKey(),
+  ownerId: text("owner_id")
+    .notNull()
+    .references(() => users.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  color: text("color"),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
+});
+
 export const sites = sqliteTable("sites", {
   id: text("id").primaryKey(),
   ownerId: text("owner_id")
@@ -18,6 +30,7 @@ export const sites = sqliteTable("sites", {
   robotsUrl: text("robots_url"),
   enabled: integer("enabled", { mode: "boolean" }).default(true),
   tags: text("tags"),
+  groupId: text("group_id").references(() => siteGroups.id),
   scanPriority: integer("scan_priority").default(1),
   scanIntervalMinutes: integer("scan_interval_minutes").default(1440),
   lastScanAt: integer("last_scan_at", { mode: "timestamp" }),
@@ -95,6 +108,9 @@ export const changes = sqliteTable("changes", {
   urlId: text("url_id").references(() => urls.id),
   type: text("type").notNull(),
   detail: text("detail"),
+  source: text("source"),
+  assignee: text("assignee"),
+  status: text("status").default("open"),
   occurredAt: integer("occurred_at", { mode: "timestamp" }).default(
     sql`(unixepoch())`,
   ),
