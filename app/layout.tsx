@@ -107,10 +107,10 @@ export default async function RootLayout({
                       </Link>
                       <Link
                         className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary hover:underline underline-offset-4"
-                        href="/dashboard/tasks"
-                        aria-label="解析任务监控"
+                        href="/scans"
+                        aria-label="扫描记录页面"
                       >
-                        任务监控
+                        扫描记录
                       </Link>
                       <Link
                         className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary hover:underline underline-offset-4"

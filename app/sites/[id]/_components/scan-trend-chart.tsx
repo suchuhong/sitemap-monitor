@@ -37,14 +37,15 @@ export function ScanTrendChart({ points }: { points: ScanPoint[] }) {
           .join(" ")} L${projectX(sorted.length - 1)},${height - padding} L${projectX(0)},${height - padding} Z`
       : "";
 
-    const monthFmt = new Intl.DateTimeFormat(undefined, {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
+    // Use consistent date formatting to avoid hydration mismatch
+    const labelList = sorted.map((p) => {
+      const date = new Date(p.startedAt);
+      const month = date.getMonth() + 1;
+      const day = date.getDate();
+      const hour = date.getHours().toString().padStart(2, '0');
+      const minute = date.getMinutes().toString().padStart(2, '0');
+      return `${month}月${day}日 ${hour}:${minute}`;
     });
-
-    const labelList = sorted.map((p) => monthFmt.format(new Date(p.startedAt)));
 
     return { path: pathD, area: areaD, maxY: maxVal, labels: labelList };
   }, [points]);

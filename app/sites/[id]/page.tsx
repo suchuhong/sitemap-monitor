@@ -16,6 +16,7 @@ import { ScanTrendChart, type ScanPoint } from "./_components/scan-trend-chart";
 import { SiteNotificationsPanel } from "./_components/site-notifications";
 import { ScanDiffPanel } from "./_components/scan-diff-panel";
 import { ChangeAssignmentList } from "./_components/change-assignment-list";
+import { SitemapTable } from "./_components/sitemap-table";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +44,7 @@ export default async function SiteDetailPage({
 
   const notificationChannels = notifications.map((channel) => ({
     ...channel,
+    type: channel.type as "email" | "webhook" | "slack",
     createdAt:
       channel.createdAt instanceof Date
         ? channel.createdAt.getTime()
@@ -200,53 +202,14 @@ export default async function SiteDetailPage({
           <CardTitle>Sitemap 列表</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs uppercase text-slate-500">
-                <tr>
-                  <th className="px-2 py-2">URL</th>
-                  <th className="px-2 py-2">类型</th>
-                  <th className="px-2 py-2">URL 数量</th>
-                  <th className="px-2 py-2">最后状态</th>
-                  <th className="px-2 py-2">更新时间</th>
-                </tr>
-              </thead>
-              <tbody className="[&_tr:last-child]:border-0">
-                {sitemaps.map((item) => (
-                  <tr key={item.id} className="border-b">
-                    <td className="px-2 py-2">
-                      <a href={item.url} target="_blank" rel="noreferrer" className="underline">
-                        {item.url}
-                      </a>
-                    </td>
-                    <td className="px-2 py-2">
-                      {item.isIndex ? <Badge variant="outline">Index</Badge> : "URL 集"}
-                    </td>
-                    <td className="px-2 py-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span>总计 {item.urlCounts.total}</span>
-                        <span className="text-emerald-600 dark:text-emerald-400">
-                          活跃 {item.urlCounts.active}
-                        </span>
-                        <span className="text-amber-600 dark:text-amber-400">
-                          失效 {item.urlCounts.inactive}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-2 py-2">{item.lastStatus ?? "—"}</td>
-                    <td className="px-2 py-2">{formatDate(item.updatedAt)}</td>
-                  </tr>
-                ))}
-                {sitemaps.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-6 text-center text-slate-500">
-                      暂未发现 sitemap
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          <SitemapTable sitemaps={sitemaps.map((item) => ({
+            id: item.id,
+            url: item.url,
+            isIndex: item.isIndex,
+            urlCounts: item.urlCounts,
+            lastStatus: item.lastStatus,
+            updatedAt: item.updatedAt,
+          }))} />
         </CardContent>
       </Card>
 

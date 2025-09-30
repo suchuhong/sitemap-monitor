@@ -247,6 +247,12 @@ export default async function SitesPage({
         page={page}
         pageSize={pageSize}
         total={total}
+        searchParams={{
+          sort,
+          dir,
+          tags: tagParam,
+          group: groupParam,
+        }}
       />
 
       {/* API Panel */}

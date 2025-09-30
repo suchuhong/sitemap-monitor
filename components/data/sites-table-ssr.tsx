@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { StatusIndicator } from "@/components/ui/status-indicator";
 import { EmptyState } from "@/components/ui/empty-state";
+import { SimplePagination } from "@/components/ui/simple-pagination";
+import { PageSizeSelectorClient } from "@/components/ui/page-size-selector-client";
+import { PageJumper } from "@/components/ui/pagination";
 import { formatDate, formatDateTime, formatTime } from "@/lib/datetime";
 
 export type SitesTableRow = {
@@ -25,6 +28,7 @@ export function SitesTableSSR({
   page,
   pageSize,
   total,
+  searchParams = {},
 }: {
   data: SitesTableRow[];
   sort: string;
@@ -32,6 +36,7 @@ export function SitesTableSSR({
   page: number;
   pageSize: number;
   total: number;
+  searchParams?: Record<string, string>;
 }) {
   const nextDir = (col: string) =>
     sort === col && dir === "asc" ? "desc" : "asc";
@@ -235,39 +240,35 @@ export function SitesTableSSR({
         </div>
       </div>
 
-      {/* Pagination */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-          <span>共 {total} 条记录</span>
-          <span>•</span>
-          <span>第 {page} 页，共 {lastPage} 页</span>
+      {/* 分页控件 */}
+      <div className="space-y-4">
+        {/* 页面大小选择器和快速跳转 */}
+        <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+          <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-4">
+            <PageSizeSelectorClient
+              currentPageSize={pageSize}
+              baseUrl="/sites"
+              searchParams={searchParams}
+              options={[5, 10, 20, 50, 100]}
+            />
+            <PageJumper
+              currentPage={page}
+              totalPages={lastPage}
+              baseUrl="/sites"
+              searchParams={searchParams}
+            />
+          </div>
         </div>
-        <div className="flex items-center space-x-2">
-          <a
-            aria-disabled={page <= 1}
-            className={`inline-flex items-center justify-center h-9 px-4 rounded-md border text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground ${
-              page <= 1 ? "pointer-events-none opacity-50" : ""
-            }`}
-            href={`/sites?page=${page - 1}&pageSize=${pageSize}&sort=${sort}&dir=${dir}`}
-          >
-            <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            上一页
-          </a>
-          <a
-            aria-disabled={page >= lastPage}
-            className={`inline-flex items-center justify-center h-9 px-4 rounded-md border text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground ${
-              page >= lastPage ? "pointer-events-none opacity-50" : ""
-            }`}
-            href={`/sites?page=${page + 1}&pageSize=${pageSize}&sort=${sort}&dir=${dir}`}
-          >
-            下一页
-            <svg className="ml-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </a>
-        </div>
+
+        {/* 主分页组件 */}
+        <SimplePagination
+          currentPage={page}
+          totalPages={lastPage}
+          pageSize={pageSize}
+          total={total}
+          baseUrl="/sites"
+          searchParams={searchParams}
+        />
       </div>
     </div>
   );
