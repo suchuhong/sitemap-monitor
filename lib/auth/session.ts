@@ -1,9 +1,9 @@
-import { randomUUID } from "crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { resolveDb } from "@/lib/db";
 import { users } from "@/lib/drizzle/schema";
+import { generateId } from "@/lib/utils/id";
 
 export const SESSION_COOKIE_NAME = "sm_session";
 
@@ -69,7 +69,7 @@ export async function clearSession() {
 
 async function createUser(email: string): Promise<UserRecord> {
   const db = resolveDb();
-  const user = { id: randomUUID(), email, createdAt: new Date() };
+  const user = { id: generateId(), email, createdAt: new Date() };
   await db.insert(users).values(user);
   return user;
 }

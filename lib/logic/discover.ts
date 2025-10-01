@@ -1,9 +1,9 @@
 import { XMLParser } from "fast-xml-parser";
-import { randomUUID } from "crypto";
 import { resolveDb } from "@/lib/db";
 import { sites, sitemaps, urls } from "@/lib/drizzle/schema";
 import { and, eq } from "drizzle-orm";
 import { fetchWithCompression } from "./net";
+import { generateId } from "@/lib/utils/id";
 
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
@@ -33,7 +33,7 @@ export async function discover({
     .where(and(eq(sites.ownerId, ownerId), eq(sites.rootUrl, rootUrl)))
     .limit(1);
 
-  const siteId = existing[0]?.id ?? randomUUID();
+  const siteId = existing[0]?.id ?? generateId();
 
   const serializedTags = serializeTags(tags);
 
@@ -68,7 +68,7 @@ export async function discover({
     for (const item of discovered) {
       if (known.has(item.url)) continue;
       await tx.insert(sitemaps).values({
-        id: randomUUID(),
+        id: generateId(),
         siteId,
         url: item.url,
         isIndex: item.isIndex,
@@ -122,7 +122,7 @@ export async function rediscoverSite({
 
     for (const item of discovered) {
       await tx.insert(sitemaps).values({
-        id: randomUUID(),
+        id: generateId(),
         siteId,
         url: item.url,
         isIndex: item.isIndex,

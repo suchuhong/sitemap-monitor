@@ -1,4 +1,3 @@
-import { randomUUID } from "crypto";
 import { Hono } from "hono";
 import { handle } from "hono/vercel";
 import { getCookie } from "hono/cookie";
@@ -23,7 +22,9 @@ import { SESSION_COOKIE_NAME } from "@/lib/auth/session";
 import type { SQL } from "drizzle-orm";
 import type { D1Database } from "@cloudflare/workers-types";
 
-export const config = { runtime: "nodejs" };
+const randomUUID = () => crypto.randomUUID();
+
+export const runtime = "edge";
 
 const app = new Hono<{
   Bindings: { DB: D1Database };

@@ -1,10 +1,10 @@
 import { XMLParser } from "fast-xml-parser";
-import { randomUUID } from "crypto";
 import { resolveDb } from "@/lib/db";
 import { sitemaps, urls, scans, changes, sites } from "@/lib/drizzle/schema";
 import { eq } from "drizzle-orm";
 import { fetchWithCompression, retry } from "./net";
 import { notifyChange } from "./notify";
+import { generateId } from "@/lib/utils/id";
 
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
@@ -69,7 +69,7 @@ export async function cronScan() {
 
 export async function runScanNow(siteId: string) {
   const db = resolveDb();
-  const scanId = randomUUID();
+  const scanId = generateId();
   await db
     .insert(scans)
     .values({ id: scanId, siteId, status: "queued", startedAt: new Date() });
@@ -78,7 +78,7 @@ export async function runScanNow(siteId: string) {
 
 export async function enqueueScan(siteId: string) {
   const db = resolveDb();
-  const scanId = randomUUID();
+  const scanId = generateId();
   await db
     .insert(scans)
     .values({ id: scanId, siteId, status: "queued", startedAt: new Date() });
