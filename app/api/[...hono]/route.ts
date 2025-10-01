@@ -6,6 +6,7 @@ import { discover, rediscoverSite } from "@/lib/logic/discover";
 import { enqueueScan, cronScan } from "@/lib/logic/scan";
 import { getSiteDetail } from "@/lib/logic/site-detail";
 import { resolveDb, type DatabaseClient } from "@/lib/db";
+import { getCfBindingEnvSafely } from "@/lib/cf";
 import {
   users,
   sites,
@@ -24,7 +25,6 @@ import type { D1Database } from "@cloudflare/workers-types";
 
 const randomUUID = () => crypto.randomUUID();
 
-export const runtime = "edge";
 
 const app = new Hono<{
   Bindings: { DB: D1Database };
@@ -46,7 +46,6 @@ app.post("/cron/scan", async (c) => {
     }
   }
 
-  resolveDb(c.env);
   const result = await cronScan();
   return c.json(result);
 });
@@ -55,8 +54,9 @@ app.use("*", async (c, next) => {
   const sessionId = getCookie(c, SESSION_COOKIE_NAME);
   if (!sessionId) return c.json({ error: "unauthorized" }, 401);
 
-  const db = resolveDb(c.env);
-  const userRows = await db
+  const bindingEnv = getCfBindingEnvSafely() ?? (c.env ? { DB: (c.env as any).DB as D1Database } : undefined);
+  const db = resolveDb({ bindingEnv }) as any;
+  const userRows = await (db as any)
     .select()
     .from(users)
     .where(eq(users.id, sessionId))
@@ -88,14 +88,15 @@ app.post("/sites", async (c) => {
 
 app.get("/sites", async (c) => {
   const ownerId = c.get("userId");
-  const db = c.get("db") ?? resolveDb(c.env);
-  const rawRows = await db
+  const bindingEnv = getCfBindingEnvSafely() ?? (c.env ? { DB: (c.env as any).DB as D1Database } : undefined);
+  const db = c.get("db") ?? (resolveDb({ bindingEnv }) as any);
+  const rawRows = await (db as any)
     .select()
     .from(sites)
     .where(eq(sites.ownerId, ownerId))
     .orderBy(desc(sites.createdAt));
 
-  const rows = rawRows.map(row => ({
+  const rows = rawRows.map((row: any) => ({
     id: row.id,
     rootUrl: row.rootUrl,
     robotsUrl: row.robotsUrl,
@@ -106,7 +107,7 @@ app.get("/sites", async (c) => {
   }));
 
   return c.json({
-    sites: rows.map((row) => ({
+    sites: rows.map((row: any) => ({
       ...row,
       tags: safeParseTags(row.tags),
     })),
@@ -116,7 +117,8 @@ app.get("/sites", async (c) => {
 app.patch("/sites/:id", async (c) => {
   const id = c.req.param("id");
   const ownerId = c.get("userId");
-  const db = c.get("db") ?? resolveDb(c.env);
+  const bindingEnv = getCfBindingEnvSafely() ?? (c.env ? { DB: (c.env as any).DB as D1Database } : undefined);
+  const db = c.get("db") ?? (resolveDb({ bindingEnv }) as any);
   const schema = z
     .object({
       rootUrl: z.string().url().optional(),
@@ -132,7 +134,7 @@ app.patch("/sites/:id", async (c) => {
   const body = schema.parse(await c.req.json());
   const normalizedTags = normalizeTagsList(body.tags);
 
-  const existingRows = await db
+  const existingRows =   await (db as any)
     .select()
     .from(sites)
     .where(eq(sites.id, id))
@@ -167,7 +169,7 @@ app.patch("/sites/:id", async (c) => {
     if (!body.groupId) {
       updatePayload.groupId = null;
     } else {
-      const groupRows = await db
+      const groupRows = await (db as any)
         .select()
         .from(siteGroups)
         .where(eq(siteGroups.id, body.groupId))
@@ -179,7 +181,7 @@ app.patch("/sites/:id", async (c) => {
     }
   }
   if (Object.keys(updatePayload).length)
-    await db
+    await (db as any)
       .update(sites)
       .set({ ...updatePayload, updatedAt: new Date() })
       .where(eq(sites.id, id));
@@ -192,8 +194,9 @@ app.patch("/sites/:id", async (c) => {
 app.delete("/sites/:id", async (c) => {
   const id = c.req.param("id");
   const ownerId = c.get("userId") as string;
-  const db = c.get("db") ?? resolveDb(c.env);
-  const existingRows = await db
+  const bindingEnv = getCfBindingEnvSafely() ?? (c.env ? { DB: (c.env as any).DB as D1Database } : undefined);
+  const db = c.get("db") ?? (resolveDb({ bindingEnv }) as any);
+  const existingRows = await (db as any)
     .select()
     .from(sites)
     .where(eq(sites.id, id))
@@ -202,7 +205,7 @@ app.delete("/sites/:id", async (c) => {
   if (!existing || existing.ownerId !== ownerId)
     return c.json({ error: "not found" }, 404);
 
-  await db.transaction(async (tx) => {
+  await db.transaction(async (tx: any) => {
     await tx.delete(changes).where(eq(changes.siteId, id));
     await tx.delete(scans).where(eq(scans.siteId, id));
     await tx.delete(urls).where(eq(urls.siteId, id));
@@ -233,14 +236,15 @@ function normalizeTagsList(tags?: string[]) {
 
 app.get("/sites/export.csv", async (c) => {
   const ownerId = c.get("userId");
-  const db = c.get("db") ?? resolveDb(c.env);
-  const rawRows = await db
+  const bindingEnv = getCfBindingEnvSafely() ?? (c.env ? { DB: (c.env as any).DB as D1Database } : undefined);
+  const db = c.get("db") ?? (resolveDb({ bindingEnv }) as any);
+  const rawRows = await (db as any)
     .select()
     .from(sites)
     .where(eq(sites.ownerId, ownerId))
     .orderBy(desc(sites.createdAt));
     
-  const rows = rawRows.map(row => ({
+  const rows = rawRows.map((row: any) => ({
     id: row.id,
     rootUrl: row.rootUrl,
     robotsUrl: row.robotsUrl,
@@ -248,11 +252,11 @@ app.get("/sites/export.csv", async (c) => {
   }));
   const csv = ["id,rootUrl,robotsUrl,createdAt"]
     .concat(
-      rows.map((r) =>
-        [r.id, r.rootUrl, r.robotsUrl ?? "", r.createdAt ?? ""]
-          .map((v) => `"${String(v).replaceAll('"', '""')}"`)
-          .join(","),
-      ),
+      rows        .map((r: any) =>
+          [r.id, r.rootUrl, r.robotsUrl ?? "", r.createdAt ?? ""]
+            .map((v: any) => `"${String(v).replaceAll('"', '""')}"`)
+            .join(","),
+        ),
     )
     .join("\n");
   return c.body(csv, 200, {
@@ -264,7 +268,7 @@ app.get("/sites/export.csv", async (c) => {
 app.get("/sites/:id", async (c) => {
   const id = c.req.param("id");
   const ownerId = c.get("userId");
-  resolveDb(c.env);
+  // Database will be resolved by getSiteDetail function
   const detail = await getSiteDetail({ siteId: id, ownerId });
   if (!detail) return c.json({ error: "not found" }, 404);
 
@@ -274,8 +278,9 @@ app.get("/sites/:id", async (c) => {
 app.post("/sites/:id/scan", async (c) => {
   const id = c.req.param("id");
   const ownerId = c.get("userId");
-  const db = c.get("db") ?? resolveDb(c.env);
-  const siteRows = await db
+  const bindingEnv = getCfBindingEnvSafely() ?? (c.env ? { DB: (c.env as any).DB as D1Database } : undefined);
+  const db = c.get("db") ?? (resolveDb({ bindingEnv }) as any);
+  const siteRows = await (db as any)
     .select()
     .from(sites)
     .where(and(eq(sites.id, id), eq(sites.ownerId, ownerId)))
@@ -309,15 +314,15 @@ app.post("/sites/:id/webhooks", async (c) => {
   if (!targetUrl) return c.json({ error: "targetUrl required" }, 400);
   const siteId = c.req.param("id");
   const ownerId = c.get("userId");
-  const db = c.get("db") ?? resolveDb(c.env);
-  const siteRows = await db
+  const db = c.get("db") ?? resolveDb({ bindingEnv: c.env, runtimeHint: "edge" }) as any;
+  const siteRows =   await (db as any)
     .select()
     .from(sites)
     .where(and(eq(sites.id, siteId), eq(sites.ownerId, ownerId)))
     .limit(1);
   const site = siteRows[0];
   if (!site) return c.json({ error: "not found" }, 404);
-  await db
+  await (db as any)
     .insert(webhooks)
     .values({ id: randomUUID(), siteId, targetUrl, secret });
   return c.json({ ok: true });
@@ -327,8 +332,9 @@ app.post("/sites/:id/test-webhook", async (c) => {
   const { notifyChange } = await import("@/lib/logic/notify");
   const siteId = c.req.param("id");
   const ownerId = c.get("userId");
-  const db = c.get("db") ?? resolveDb(c.env);
-  const siteRows = await db
+  const bindingEnv = getCfBindingEnvSafely() ?? (c.env ? { DB: (c.env as any).DB as D1Database } : undefined);
+  const db = c.get("db") ?? (resolveDb({ bindingEnv }) as any);
+  const siteRows = await (db as any)
     .select()
     .from(sites)
     .where(and(eq(sites.id, siteId), eq(sites.ownerId, ownerId)))
@@ -348,9 +354,10 @@ app.post("/sites/:id/test-webhook", async (c) => {
 app.get("/sites/:id/notifications", async (c) => {
   const siteId = c.req.param("id");
   const ownerId = c.get("userId");
-  const db = c.get("db") ?? resolveDb(c.env);
+  const bindingEnv = getCfBindingEnvSafely() ?? (c.env ? { DB: (c.env as any).DB as D1Database } : undefined);
+  const db = c.get("db") ?? (resolveDb({ bindingEnv }) as any);
 
-  const siteRows = await db
+  const siteRows = await (db as any)
     .select()
     .from(sites)
     .where(and(eq(sites.id, siteId), eq(sites.ownerId, ownerId)))
@@ -358,12 +365,12 @@ app.get("/sites/:id/notifications", async (c) => {
   const site = siteRows[0];
   if (!site) return c.json({ error: "not found" }, 404);
 
-  const channelRows = await db
+  const channelRows =   await (db as any)
     .select()
     .from(notificationChannels)
     .where(eq(notificationChannels.siteId, siteId));
 
-  const channels = channelRows.map(row => ({
+  const channels = channelRows.map((row: any) => ({
     id: row.id,
     type: row.type,
     target: row.target,
@@ -377,9 +384,10 @@ app.get("/sites/:id/notifications", async (c) => {
 app.post("/sites/:id/notifications", async (c) => {
   const siteId = c.req.param("id");
   const ownerId = c.get("userId");
-  const db = c.get("db") ?? resolveDb(c.env);
+  const bindingEnv = getCfBindingEnvSafely() ?? (c.env ? { DB: (c.env as any).DB as D1Database } : undefined);
+  const db = c.get("db") ?? (resolveDb({ bindingEnv }) as any);
 
-  const siteRows = await db
+  const siteRows = await (db as any)
     .select()
     .from(sites)
     .where(and(eq(sites.id, siteId), eq(sites.ownerId, ownerId)))
@@ -396,7 +404,7 @@ app.post("/sites/:id/notifications", async (c) => {
   const payload = schema.parse(body);
 
   const id = randomUUID();
-  await db
+  await (db as any)
     .insert(notificationChannels)
     .values({
       id,
@@ -413,9 +421,9 @@ app.delete("/sites/:id/notifications/:notificationId", async (c) => {
   const siteId = c.req.param("id");
   const notificationId = c.req.param("notificationId");
   const ownerId = c.get("userId");
-  const db = c.get("db") ?? resolveDb(c.env);
+  const db = c.get("db") ?? resolveDb({ bindingEnv: c.env, runtimeHint: "edge" }) as any;
 
-  const siteRows = await db
+  const siteRows =   await (db as any)
     .select()
     .from(sites)
     .where(and(eq(sites.id, siteId), eq(sites.ownerId, ownerId)))
@@ -423,7 +431,7 @@ app.delete("/sites/:id/notifications/:notificationId", async (c) => {
   const site = siteRows[0];
   if (!site) return c.json({ error: "not found" }, 404);
 
-  await db
+  await (db as any)
     .delete(notificationChannels)
     .where(and(eq(notificationChannels.siteId, siteId), eq(notificationChannels.id, notificationId)));
 
@@ -433,8 +441,8 @@ app.delete("/sites/:id/notifications/:notificationId", async (c) => {
 app.get("/sites/:id/changes.csv", async (c) => {
   const id = c.req.param("id");
   const ownerId = c.get("userId");
-  const db = c.get("db") ?? resolveDb(c.env);
-  const siteRows = await db
+  const db = c.get("db") ?? resolveDb({ bindingEnv: c.env, runtimeHint: "edge" }) as any;
+  const siteRows =   await (db as any)
     .select()
     .from(sites)
     .where(and(eq(sites.id, id), eq(sites.ownerId, ownerId)))
@@ -467,29 +475,29 @@ app.get("/sites/:id/changes.csv", async (c) => {
   let whereClause: SQL | undefined = firstFilter;
   for (const condition of restFilters) whereClause = and(whereClause!, condition);
 
-  const rawList = await db
+  const rawList =   await (db as any)
     .select()
     .from(changes)
     .where(whereClause)
     .orderBy(desc(changes.occurredAt));
     
-  const list = rawList.map(row => ({
+  const list = rawList.map((row: any) => ({
     type: row.type,
     detail: row.detail,
     occurredAt: row.occurredAt,
   }));
 
   const rows = [["type", "detail", "occurredAt"]].concat(
-    list.map((r) => [
+    list.map((r: any) => [
       r.type,
       r.detail ?? "",
       new Date(Number(r.occurredAt || 0) * 1000).toISOString(),
     ]),
   );
   const csv = rows
-    .map((r) =>
+    .map((r: any) =>
       r
-        .map((v) => {
+        .map((v: any) => {
           const s = String(v).replaceAll('"', '""');
           return `"${s}"`;
         })
@@ -510,8 +518,8 @@ app.get("/sites/:id/scan-diff", async (c) => {
   const scanId = url.searchParams.get("scanId");
   if (!scanId) return c.json({ error: "scanId required" }, 400);
 
-  const db = c.get("db") ?? resolveDb(c.env);
-  const scanRows = await db
+  const db = c.get("db") ?? resolveDb({ bindingEnv: c.env, runtimeHint: "edge" }) as any;
+  const scanRows = await (db as any)
     .select()
     .from(scans)
     .where(eq(scans.id, scanId));
@@ -523,7 +531,7 @@ app.get("/sites/:id/scan-diff", async (c) => {
   } : undefined;
   if (!scanRow || scanRow.siteId !== siteId) return c.json({ error: "not found" }, 404);
 
-  const siteRows = await db
+  const siteRows =   await (db as any)
     .select()
     .from(sites)
     .where(eq(sites.id, siteId))
@@ -531,20 +539,20 @@ app.get("/sites/:id/scan-diff", async (c) => {
   const site = siteRows[0];
   if (!site || site.ownerId !== ownerId) return c.json({ error: "not found" }, 404);
 
-  const rowData = await db
+  const rowData =   await (db as any)
     .select()
     .from(changes)
     .where(and(eq(changes.siteId, siteId), eq(changes.scanId, scanId)))
     .orderBy(desc(changes.occurredAt));
 
-  const rows = rowData.map(row => ({
+  const rows = rowData.map((row: any) => ({
     type: row.type,
     detail: row.detail,
     occurredAt: row.occurredAt,
   }));
 
   const summary = rows.reduce(
-    (acc, row) => {
+    (acc: any, row: any) => {
       if (row.type === "added") acc.added += 1;
       else if (row.type === "removed") acc.removed += 1;
       else if (row.type === "updated") acc.updated += 1;

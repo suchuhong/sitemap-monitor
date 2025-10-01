@@ -2,11 +2,11 @@ import { ScansTable, type ScanRecord } from "./_components/scans-table";
 import { ScansFilters } from "./_components/scans-filters";
 import type { Metadata } from "next";
 import { resolveDb } from "@/lib/db";
+import { getCfBindingEnvSafely } from "@/lib/cf";
 import { scans, sites } from "@/lib/drizzle/schema";
 import { desc, asc, like, eq, and, count } from "drizzle-orm";
 import { requireUser } from "@/lib/auth/session";
 
-export const runtime = 'edge';
 
 export const metadata: Metadata = {
     title: "扫描记录 - Sitemap Monitor",
@@ -23,7 +23,7 @@ async function getScansData(params: {
     userId: string;
 }) {
     const { page, pageSize, sort, sortDirection, status, site, userId } = params;
-    const db = resolveDb();
+    const db = resolveDb({ bindingEnv: getCfBindingEnvSafely() }) as any;
     
     // 构建查询条件
     const conditions = [eq(sites.ownerId, userId)];
@@ -182,7 +182,7 @@ export default async function ScansPage({
     });
 
     // 获取统计数据（用于卡片显示）
-    const db = resolveDb();
+    const db = resolveDb({ bindingEnv: getCfBindingEnvSafely() }) as any;
     const statsResult = await db
         .select({
             status: scans.status,

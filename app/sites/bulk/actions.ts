@@ -11,7 +11,7 @@ type BulkAction = "assignGroup" | "clearGroup" | "appendTag" | "removeTag" | "re
 
 export async function performBulkAction(formData: FormData) {
   const user = await requireUser({ redirectTo: "/sites/bulk" });
-  const db = resolveDb();
+  const db = resolveDb({ runtimeHint: "edge" }) as any;
   const siteIds = formData.getAll("siteId").map(String).filter(Boolean);
   if (!siteIds.length) redirect(`/sites/bulk?error=no_selection`);
 
@@ -71,7 +71,7 @@ async function mutateTags(
   ownerId: string,
   updater: (tags: string[]) => string[],
 ) {
-  const db = resolveDb();
+  const db = resolveDb({ runtimeHint: "edge" }) as any;
   const rows = await db
     .select({ id: sites.id, tags: sites.tags })
     .from(sites)

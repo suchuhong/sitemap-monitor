@@ -7,9 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { createGroupAction, updateGroupAction } from "./actions";
+import { getCfBindingEnvSafely } from "@/lib/cf";
 import { DeleteGroupButton } from "./delete-group-button";
 
-export const runtime = 'edge';
 export const dynamic = "force-dynamic";
 
 export default async function SiteGroupsPage({
@@ -124,7 +124,7 @@ export default async function SiteGroupsPage({
 }
 
 async function fetchGroupsWithCounts(ownerId: string) {
-  const db = resolveDb();
+  const db = resolveDb({ bindingEnv: getCfBindingEnvSafely() }) as any;
   return await db
     .select({
       id: siteGroups.id,
@@ -143,7 +143,7 @@ async function fetchGroupsWithCounts(ownerId: string) {
 }
 
 async function countSites(ownerId: string) {
-  const db = resolveDb();
+  const db = resolveDb({ bindingEnv: getCfBindingEnvSafely() }) as any;
   const [row] = await db
     .select({ count: sql<number>`count(*)` })
     .from(sites)

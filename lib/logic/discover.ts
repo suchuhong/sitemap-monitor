@@ -1,5 +1,6 @@
 import { XMLParser } from "fast-xml-parser";
 import { resolveDb } from "@/lib/db";
+import { getCfBindingEnvSafely } from "@/lib/cf";
 import { sites, sitemaps, urls } from "@/lib/drizzle/schema";
 import { and, eq } from "drizzle-orm";
 import { fetchWithCompression } from "./net";
@@ -22,7 +23,7 @@ export async function discover({
   ownerId: string;
   tags?: string[];
 }) {
-  const db = resolveDb();
+  const db = resolveDb({ bindingEnv: getCfBindingEnvSafely() }) as any;
   const robotsUrl = new URL("/robots.txt", rootUrl).toString();
   const smCandidates = await gatherInitialSitemaps(rootUrl, robotsUrl);
   const discovered = await collectSitemaps(smCandidates);
@@ -92,7 +93,7 @@ export async function rediscoverSite({
   rootUrl: string;
   tags?: string[];
 }) {
-  const db = resolveDb();
+  const db = resolveDb({ bindingEnv: getCfBindingEnvSafely() }) as any;
   const robotsUrl = new URL("/robots.txt", rootUrl).toString();
   const smCandidates = await gatherInitialSitemaps(rootUrl, robotsUrl);
   const discovered = await collectSitemaps(smCandidates);

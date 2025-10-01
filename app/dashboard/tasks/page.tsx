@@ -4,9 +4,9 @@ import { formatDateTime } from "@/lib/datetime";
 import { requireUser } from "@/lib/auth/session";
 import { resolveDb } from "@/lib/db";
 import { scans, sites, changes } from "@/lib/drizzle/schema";
+import { getCfBindingEnvSafely } from "@/lib/cf";
 import { desc, eq } from "drizzle-orm";
 
-export const runtime = 'edge';
 export const dynamic = "force-dynamic";
 
 type ScanWithSite = {
@@ -35,7 +35,7 @@ type ChangeRecord = {
 
 export default async function TasksPage() {
   const user = await requireUser({ redirectTo: "/dashboard/tasks" });
-  const db = resolveDb();
+  const db = resolveDb({ bindingEnv: getCfBindingEnvSafely() }) as any;
 
   const [rawScanRows, rawChangeRows] = await Promise.all([
     db
@@ -54,7 +54,7 @@ export default async function TasksPage() {
       .limit(100),
   ]);
 
-  const scanRows: ScanWithSite[] = rawScanRows.map(row => ({
+  const scanRows: ScanWithSite[] = rawScanRows.map((row: any) => ({
     id: row.scans.id,
     siteId: row.scans.siteId,
     rootUrl: row.sites.rootUrl,
@@ -68,7 +68,7 @@ export default async function TasksPage() {
     error: row.scans.error,
   }));
 
-  const changeRows: ChangeRecord[] = rawChangeRows.map(row => ({
+  const changeRows: ChangeRecord[] = rawChangeRows.map((row: any) => ({
     id: row.changes.id,
     siteId: row.changes.siteId,
     rootUrl: row.sites.rootUrl,

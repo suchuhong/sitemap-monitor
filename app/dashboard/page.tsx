@@ -6,12 +6,12 @@ import { sites, changes, scans } from "@/lib/drizzle/schema";
 import { gte, eq, and } from "drizzle-orm";
 import { requireUser } from "@/lib/auth/session";
 import { ChangeTrendChart, type ChangeTrendPoint } from "./_components/change-trend-chart";
+import { getCfBindingEnvSafely } from "@/lib/cf";
 
-export const runtime = 'edge';
 
 export default async function Page() {
   const user = await requireUser({ redirectTo: "/dashboard" });
-  const db = resolveDb();
+  const db = resolveDb({ bindingEnv: getCfBindingEnvSafely() }) as any;
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
   const siteRows = await db

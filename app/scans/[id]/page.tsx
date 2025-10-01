@@ -1,12 +1,12 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { resolveDb } from "@/lib/db";
+import { getCfBindingEnvSafely } from "@/lib/cf";
 import { scans, sites, changes, sitemaps } from "@/lib/drizzle/schema";
 import { eq, desc } from "drizzle-orm";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { formatDateTime } from "@/lib/datetime";
 
-export const runtime = 'edge';
 export const dynamic = "force-dynamic";
 
 export default async function ScanDetailPage({
@@ -15,7 +15,7 @@ export default async function ScanDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const db = resolveDb();
+  const db = resolveDb({ bindingEnv: getCfBindingEnvSafely() }) as any;
 
   const [scan] = await db
     .select()
@@ -35,14 +35,14 @@ export default async function ScanDetailPage({
     .select()
     .from(sitemaps)
     .where(eq(sitemaps.siteId, scan.siteId));
-  const sitemapList = sitemapRows.map((row) => ({ id: row.id, url: row.url }));
+  const sitemapList = sitemapRows.map((row: any) => ({ id: row.id, url: row.url }));
 
   const changeRows = await db
     .select()
     .from(changes)
     .where(eq(changes.scanId, scan.id))
     .orderBy(desc(changes.occurredAt));
-  const changeList = changeRows.map((row) => ({
+  const changeList = changeRows.map((row: any) => ({
     id: row.id,
     type: row.type,
     detail: row.detail,
@@ -130,7 +130,7 @@ export default async function ScanDetailPage({
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
           {sitemapList.length === 0 && <p className="text-muted-foreground">无相关 sitemap 记录</p>}
-          {sitemapList.map((item) => (
+          {sitemapList.map((item: any) => (
             <div key={item.id} className="flex justify-between border-b pb-2">
               <span>{item.url}</span>
             </div>
@@ -144,7 +144,7 @@ export default async function ScanDetailPage({
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
           {changeList.length === 0 && <p className="text-muted-foreground">没有捕获到差异。</p>}
-          {changeList.map((item) => (
+          {changeList.map((item: any) => (
             <div key={item.id} className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
               <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <span>{formatDateTime(item.occurredAt, { includeSeconds: true })}</span>

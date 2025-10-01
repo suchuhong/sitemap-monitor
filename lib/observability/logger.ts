@@ -20,7 +20,7 @@ export async function logEvent({
   level?: LogLevel;
 }) {
   try {
-    const db = resolveDb();
+    const db = resolveDb() as any; // Auto-detect runtime
     await db.insert(observabilityLogs).values({
       id: randomUUID(),
       type,

@@ -6,9 +6,9 @@ import { eq, sql } from "drizzle-orm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { performBulkAction } from "./actions";
+import { getCfBindingEnvSafely } from "@/lib/cf";
 import { Input } from "@/components/ui/input";
 
-export const runtime = 'edge';
 export const dynamic = "force-dynamic";
 
 type SiteItem = {
@@ -62,7 +62,7 @@ export default async function BulkSitesPage({
 }
 
 async function fetchSites(ownerId: string) {
-  const db = resolveDb();
+  const db = resolveDb({ bindingEnv: getCfBindingEnvSafely() }) as any;
   return await db
     .select({
       id: sites.id,
@@ -78,7 +78,7 @@ async function fetchSites(ownerId: string) {
 }
 
 async function fetchGroups(ownerId: string) {
-  const db = resolveDb();
+  const db = resolveDb({ bindingEnv: getCfBindingEnvSafely() }) as any;
   return await db
     .select({ id: siteGroups.id, name: siteGroups.name })
     .from(siteGroups)

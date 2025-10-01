@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
 import { LoginForm } from "./sign-in-form";
 
-export const runtime = 'edge';
 
 export default async function LoginPage({
   searchParams,

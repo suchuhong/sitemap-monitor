@@ -6,7 +6,6 @@ import { Loading, LoadingCard, LoadingTable } from "@/components/ui/loading";
 import { Input } from "@/components/ui/input";
 import { EmptyStateDemo } from "./empty-state-demo";
 
-export const runtime = 'edge';
 
 export default function StyleGuidePage() {
   return (

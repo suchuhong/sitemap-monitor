@@ -10,7 +10,7 @@ import { and, eq } from "drizzle-orm";
 
 export async function createGroupAction(formData: FormData) {
   const user = await requireUser({ redirectTo: "/sites/groups" });
-  const db = resolveDb();
+  const db = resolveDb({ runtimeHint: "edge" }) as any;
   const name = normalizeRequired(formData.get("name"));
   const description = normalizeOptional(formData.get("description"));
   const color = normalizeOptional(formData.get("color"));
@@ -36,7 +36,7 @@ export async function createGroupAction(formData: FormData) {
 
 export async function updateGroupAction(formData: FormData) {
   const user = await requireUser({ redirectTo: "/sites/groups" });
-  const db = resolveDb();
+  const db = resolveDb({ runtimeHint: "edge" }) as any;
   const id = (formData.get("id") as string | null)?.trim();
   if (!id) redirect(`/sites/groups?error=missing_id`);
   const name = normalizeOptional(formData.get("name"));
@@ -72,7 +72,7 @@ export async function updateGroupAction(formData: FormData) {
 
 export async function deleteGroupAction(formData: FormData) {
   const user = await requireUser({ redirectTo: "/sites/groups" });
-  const db = resolveDb();
+  const db = resolveDb({ runtimeHint: "edge" }) as any;
   const id = (formData.get("id") as string | null)?.trim();
   if (!id) redirect(`/sites/groups?error=missing_id`);
 

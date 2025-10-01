@@ -2,7 +2,6 @@ import { DataTable, createColumn, columnRenderers } from "@/components/ui/data-t
 import { Badge } from "@/components/ui/badge";
 import type { Metadata } from "next";
 
-export const runtime = 'edge';
 
 export const metadata: Metadata = {
     title: "博客文章列表 - Sitemap Monitor",

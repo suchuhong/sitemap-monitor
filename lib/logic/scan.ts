@@ -1,5 +1,6 @@
 import { XMLParser } from "fast-xml-parser";
 import { resolveDb } from "@/lib/db";
+import { getCfBindingEnvSafely } from "@/lib/cf";
 import { sitemaps, urls, scans, changes, sites } from "@/lib/drizzle/schema";
 import { eq } from "drizzle-orm";
 import { fetchWithCompression, retry } from "./net";
@@ -20,7 +21,7 @@ const scanQueue: ScanJob[] = [];
 let processing = false;
 
 export async function cronScan() {
-  const db = resolveDb();
+  const db = resolveDb({ bindingEnv: getCfBindingEnvSafely() }) as any;
   const now = Date.now();
   const activeSites = await db
     .select({
@@ -68,7 +69,7 @@ export async function cronScan() {
 }
 
 export async function runScanNow(siteId: string) {
-  const db = resolveDb();
+  const db = resolveDb({ bindingEnv: getCfBindingEnvSafely() }) as any;
   const scanId = generateId();
   await db
     .insert(scans)
@@ -77,7 +78,7 @@ export async function runScanNow(siteId: string) {
 }
 
 export async function enqueueScan(siteId: string) {
-  const db = resolveDb();
+  const db = resolveDb({ bindingEnv: getCfBindingEnvSafely() }) as any;
   const scanId = generateId();
   await db
     .insert(scans)
@@ -103,7 +104,7 @@ async function processQueue() {
 }
 
 async function executeScan({ scanId, siteId }: ScanJob) {
-  const db = resolveDb();
+  const db = resolveDb({ bindingEnv: getCfBindingEnvSafely() }) as any;
   const startTime = new Date();
   await db
     .update(scans)
@@ -206,7 +207,7 @@ async function scanOneSitemap({
   sitemap: SitemapRow;
   scanId: string;
 }) {
-  const db = resolveDb();
+  const db = resolveDb() as any; // Auto-detect runtime
   const headers: Record<string, string> = {};
   if (sm.lastEtag) headers["If-None-Match"] = sm.lastEtag;
   if (sm.lastModified) headers["If-Modified-Since"] = sm.lastModified;
@@ -336,7 +337,7 @@ async function scanOneSitemap({
       await db
         .insert(changes)
         .values({
-          id: randomUUID(),
+          id: generateId(),
           siteId,
           scanId,
           urlId: record.id,
@@ -348,7 +349,7 @@ async function scanOneSitemap({
   }
 
   for (const detail of toAdd) {
-    const urlId = randomUUID();
+    const urlId = generateId();
     await db
       .insert(urls)
       .values({
@@ -366,7 +367,7 @@ async function scanOneSitemap({
     await db
       .insert(changes)
       .values({
-        id: randomUUID(),
+        id: generateId(),
         siteId,
         scanId,
         urlId,
@@ -384,7 +385,7 @@ async function scanOneSitemap({
     await db
       .insert(changes)
       .values({
-        id: randomUUID(),
+        id: generateId(),
         siteId,
         scanId,
         urlId: row.id,
