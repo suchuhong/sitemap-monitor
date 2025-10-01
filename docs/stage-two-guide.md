@@ -16,13 +16,14 @@
 - **入口**：`/sites/:id` → “通知渠道” 面板。
 - **新增渠道**：
   - Webhook：填写回调地址，可选 HMAC 密钥（与日志中的签名保持一致）。
-  - Email：输入接收邮箱，系统会以日志形式模拟发送。
-  - Slack：填写 Slack Incoming Webhook URL，控制台同样会输出模拟发送信息。
+  - Email：输入收件地址，系统将通过配置好的 SMTP 服务发送正式邮件。
+  - Slack：填写 Slack Incoming Webhook URL（或自建 API 地址 + Bearer Token），系统会直接推送消息到频道。
 - **API**：
   - `GET /api/sites/:id/notifications` 获取当前渠道列表。
   - `POST /api/sites/:id/notifications` 添加渠道。
   - `DELETE /api/sites/:id/notifications/:notificationId` 移除渠道。
-- **触发**：当扫描任务无错误且存在新增/删除/更新 URL 时，`notifyChange` 会遍历所有渠道输出/投递通知。
+- **触发**：当扫描任务无错误且存在新增/删除/更新 URL 时，`notifyChange` 会遍历所有渠道完成投递。
+- **配置要求**：邮件与 Slack 渠道需要提前在 `.env` 中配置 SMTP / 超时等参数，详见《通知渠道配置与调试指南》。
 
 ## 3. 智能扫描调度
 

@@ -114,6 +114,13 @@ export default async function RootLayout({
                       </Link>
                       <Link
                         className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary hover:underline underline-offset-4"
+                        href="/admin/scheduler"
+                        aria-label="调度器管理页面"
+                      >
+                        调度器
+                      </Link>
+                      <Link
+                        className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary hover:underline underline-offset-4"
                         href="/blog"
                         aria-label="SEO优化博客"
                       >

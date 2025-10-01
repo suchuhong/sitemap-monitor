@@ -64,16 +64,6 @@ export default async function Page() {
     .groupBy(sql`strftime('%Y-%m-%d', ${changes.occurredAt}, 'unixepoch')`)
     .orderBy(sql`strftime('%Y-%m-%d', ${changes.occurredAt}, 'unixepoch')`);
 
-  const changeStatusRows = await db
-    .select({
-      status: sql<string>`lower(trim(coalesce(${changes.status}, 'open')))`,
-      count: sql<number>`count(*)`,
-    })
-    .from(changes)
-    .innerJoin(sites, eq(changes.siteId, sites.id))
-    .where(eq(sites.ownerId, user.id))
-    .groupBy(sql`lower(trim(coalesce(${changes.status}, 'open')))`);
-
   const sitesCount = Number(siteRow?.value ?? 0);
   const added24h = Number(added ?? 0);
   const removed24h = Number(removed ?? 0);
@@ -92,18 +82,6 @@ export default async function Page() {
     removed: Number(row.removed ?? 0),
     updated: Number(row.updated ?? 0),
   }));
-
-  const changeStatusSummary = changeStatusRows.reduce(
-    (acc, row) => {
-      const key = (row.status ?? "open").toLowerCase();
-      const count = Number(row.count ?? 0);
-      if (key === "resolved") acc.resolved += count;
-      else if (key === "in_progress") acc.inProgress += count;
-      else acc.open += count;
-      return acc;
-    },
-    { open: 0, inProgress: 0, resolved: 0 },
-  );
 
   return (
     <div className="space-y-8">
@@ -205,32 +183,6 @@ export default async function Page() {
             <p className="text-xs text-muted-foreground mt-1">
               分钟 / 次扫描
             </p>
-          </CardContent>
-        </Card>
-        <Card className="hover-lift">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              变更分派状态
-            </CardTitle>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
-              </svg>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-2 text-xs text-muted-foreground">
-            <div className="flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
-              <span>未处理</span>
-              <span className="font-semibold text-rose-500">{changeStatusSummary.open}</span>
-            </div>
-            <div className="flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
-              <span>处理中</span>
-              <span className="font-semibold text-amber-500">{changeStatusSummary.inProgress}</span>
-            </div>
-            <div className="flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
-              <span>已解决</span>
-              <span className="font-semibold text-emerald-500">{changeStatusSummary.resolved}</span>
-            </div>
           </CardContent>
         </Card>
       </div>

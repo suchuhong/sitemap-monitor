@@ -338,7 +338,6 @@ async function scanOneSitemap({
           type: "updated",
           detail: `${record.loc} | ${changesForUrl.join("; ")}`,
           source: "scanner",
-          status: "open",
         });
     }
   }
@@ -369,7 +368,6 @@ async function scanOneSitemap({
         type: "added",
         detail: detail.loc,
         source: "scanner",
-        status: "open",
       });
   }
 
@@ -388,7 +386,6 @@ async function scanOneSitemap({
         type: "removed",
         detail: row.loc,
         source: "scanner",
-        status: "open",
       });
   }
 

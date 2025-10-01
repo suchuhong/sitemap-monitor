@@ -15,7 +15,7 @@ import { ConfirmScan } from "./_components/ConfirmScan";
 import { ScanTrendChart, type ScanPoint } from "./_components/scan-trend-chart";
 import { SiteNotificationsPanel } from "./_components/site-notifications";
 import { ScanDiffPanel } from "./_components/scan-diff-panel";
-import { ChangeAssignmentList } from "./_components/change-assignment-list";
+import { ChangeList } from "./_components/change-list";
 import { SitemapTable } from "./_components/sitemap-table";
 
 export const dynamic = "force-dynamic";
@@ -248,16 +248,13 @@ export default async function SiteDetailPage({
             <CardTitle>最近变更</CardTitle>
           </CardHeader>
           <CardContent>
-            <ChangeAssignmentList
-              siteId={site.id}
+            <ChangeList
               items={recentChanges.map((change) => ({
                 id: change.id,
                 type: change.type,
                 detail: change.detail,
                 occurredAt: change.occurredAt,
                 source: change.source,
-                assignee: change.assignee,
-                status: change.status,
               }))}
             />
           </CardContent>

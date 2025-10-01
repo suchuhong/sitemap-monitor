@@ -7,6 +7,7 @@ import { discover, rediscoverSite } from "@/lib/logic/discover";
 import { enqueueScan, cronScan } from "@/lib/logic/scan";
 import { getSiteDetail } from "@/lib/logic/site-detail";
 import { db } from "@/lib/db";
+import { initializeScheduler } from "@/lib/startup";
 import {
   users,
   sites,
@@ -24,6 +25,9 @@ import { logEvent } from "@/lib/observability/logger";
 import type { SQL } from "drizzle-orm";
 
 export const config = { runtime: "nodejs" };
+
+// 初始化调度器
+initializeScheduler();
 
 const app = new Hono<{ Variables: { userId: string; userEmail?: string; requestId: string } }>().basePath("/api");
 
@@ -251,6 +255,78 @@ app.post("/cron/scan", async (c) => {
     return c.body("unauthorized", 401);
   const r = await cronScan();
   return c.json(r);
+});
+
+app.get("/scheduler/status", async (c) => {
+  const { advancedScheduler } = await import("@/lib/scheduler/advanced-scheduler");
+  return c.json({
+    type: "advanced",
+    ...advancedScheduler.getStatus(),
+    tasks: advancedScheduler.listTasks(),
+  });
+});
+
+app.post("/scheduler/start", async (c) => {
+  const { advancedScheduler } = await import("@/lib/scheduler/advanced-scheduler");
+  advancedScheduler.start();
+  return c.json({ ok: true, status: "started", type: "advanced" });
+});
+
+app.post("/scheduler/stop", async (c) => {
+  const { advancedScheduler } = await import("@/lib/scheduler/advanced-scheduler");
+  advancedScheduler.stop();
+  return c.json({ ok: true, status: "stopped", type: "advanced" });
+});
+
+app.post("/scheduler/scan", async (c) => {
+  const result = await cronScan();
+  return c.json(result);
+});
+
+app.post("/scheduler/tasks", async (c) => {
+  const body = await c.req.json();
+  const schema = z.object({
+    name: z.string().min(1),
+    schedule: z.string().min(1), // cron expression
+    action: z.enum(["scan", "custom"]).optional().default("scan")
+  });
+  
+  const { name, schedule, action } = schema.parse(body);
+  
+  try {
+    const { advancedScheduler } = await import("@/lib/scheduler/advanced-scheduler");
+    const { cronScan } = await import("@/lib/logic/scan");
+    
+    const callback = action === "scan" 
+      ? async () => {
+          console.log(`Running custom scan task: ${name}`);
+          await cronScan();
+        }
+      : async () => {
+          console.log(`Running custom task: ${name}`);
+        };
+    
+    advancedScheduler.addCustomTask(name, schedule, callback);
+    return c.json({ ok: true, message: `Task ${name} added successfully` });
+  } catch (error) {
+    return c.json({
+      error: error instanceof Error ? error.message : "Failed to add task"
+    }, 400);
+  }
+});
+
+app.delete("/scheduler/tasks/:taskName", async (c) => {
+  const taskName = c.req.param("taskName");
+  
+  try {
+    const { advancedScheduler } = await import("@/lib/scheduler/advanced-scheduler");
+    advancedScheduler.removeTask(taskName);
+    return c.json({ ok: true, message: `Task ${taskName} removed successfully` });
+  } catch (error) {
+    return c.json({ 
+      error: error instanceof Error ? error.message : "Failed to remove task" 
+    }, 400);
+  }
 });
 
 export const GET = handle(app);

@@ -105,8 +105,6 @@ export async function getSiteDetail({
       type: changes.type,
       detail: changes.detail,
       source: changes.source,
-      assignee: changes.assignee,
-      status: changes.status,
       occurredAt: changes.occurredAt,
     })
     .from(changes)
