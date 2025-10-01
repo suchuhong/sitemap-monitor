@@ -54,27 +54,18 @@ export function resolveDb(opts: ResolveDbOpts = {}): DatabaseClient {
 
   const isEdge = detectEdgeRuntime(runtimeHint);
 
-  // 2) Edge path: use @libsql/client/web (HTTP only). No file: URLs, no process.*
+  // 2) Edge path: strictly require D1 binding to avoid bundling libsql clients in Pages build
   if (isEdge) {
-    if (!globalForDb.__libsqlDb) {
-      const url = urlArg ?? (typeof process !== "undefined" ? process.env.TURSO_DATABASE_URL : undefined);
-      const authToken = tokenArg ?? (typeof process !== "undefined" ? process.env.TURSO_AUTH_TOKEN : undefined);
-
-      if (!url) {
-        throw new Error(
-          "Edge runtime: no database available. Provide a D1 binding or pass a remote libSQL URL via resolveDb({ url, authToken })."
-        );
+    if (bindingEnv?.DB) {
+      if (!globalForDb.__d1Db) {
+        globalForDb.__d1Db = drizzleD1(bindingEnv.DB);
       }
-      if (url.startsWith("file:")) {
-        throw new Error("Edge runtime: file:// databases are not supported. Use a remote HTTP URL.");
-      }
-
-      // Import the Edge-safe client only on Edge
-      const { createClient } = require("@libsql/client/web"); // dynamic require keeps Node bundle clean
-      const client = createClient({ url, authToken });
-      globalForDb.__libsqlDb = drizzleLibSQL(client);
+      return globalForDb.__d1Db;
     }
-    return globalForDb.__libsqlDb!;
+    // Do not import any libsql client on Edge to prevent bundling non-JS assets in Pages builds
+    throw new Error(
+      "Edge runtime: database not available. Provide a Cloudflare D1 binding (env.DB)."
+    );
   }
 
   // 3) Node path: @libsql/client (supports file: and remote)
@@ -104,7 +95,10 @@ export function resolveDb(opts: ResolveDbOpts = {}): DatabaseClient {
       // Optional: console.log("Using local SQLite file:", url);
     }
 
-    const { createClient } = require("@libsql/client"); // Node client
+    // Use eval('require') to avoid bundlers (Edge build) from statically including @libsql/client
+    // eslint-disable-next-line @typescript-eslint/no-implied-eval
+    const nodeRequire = (0, eval)("require") as (id: string) => any;
+    const { createClient } = nodeRequire("@libsql/client"); // Node client
     const client = createClient({ url, authToken });
     globalForDb.__libsqlDb = drizzleLibSQL(client);
   }
