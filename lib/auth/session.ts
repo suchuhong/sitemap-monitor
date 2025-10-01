@@ -38,10 +38,10 @@ export async function createUserSession(email: string): Promise<UserRecord> {
 }
 
 export async function getCurrentUser(): Promise<UserRecord | null> {
-  const db = resolveDb();
   const session = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
   if (!session) return null;
 
+  const db = resolveDb();
   const [user] = await db
     .select({ id: users.id, email: users.email, createdAt: users.createdAt })
     .from(users)
