@@ -6,10 +6,3 @@ pages_build_output_dir = ".vercel/output/static"
 binding = "DB"
 database_name = "sitemap-monitor"
 database_id = "7ac9be7e-8097-4694-a72f-0aa220bdc541" # replace with your D1 Database ID
-
-[vars]
-APP_BASE_URL = "https://sitemap-monitor.pages.dev"
-CRON_TOKEN = "suchsuchsuchsuch"
-
-[triggers]
-crons = ["0 * * * *"]
