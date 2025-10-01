@@ -1,4 +1,5 @@
-import { setTimeout as sleep } from "timers/promises";
+// Web API compatible sleep function
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 type FetchOptions = Omit<RequestInit, "signal"> & {
   timeout?: number;

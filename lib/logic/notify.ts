@@ -1,6 +1,22 @@
-import crypto from "crypto";
-import nodemailer from "nodemailer";
-import type SMTPTransport from "nodemailer/lib/smtp-transport";
+// Edge-compatible HMAC function using Web Crypto API
+async function createHmacSignature(secret: string, data: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(data));
+  return Array.from(new Uint8Array(signature))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+// Email functionality disabled in edge runtime - nodemailer requires Node.js modules
+// To enable email notifications, deploy email-specific API routes with Node.js runtime
+const EMAIL_DISABLED_IN_EDGE_RUNTIME = true;
 import { resolveDb } from "@/lib/db";
 import { notificationChannels, webhooks, sites } from "@/lib/drizzle/schema";
 import { eq } from "drizzle-orm";
@@ -109,7 +125,7 @@ async function loadChannels(siteId: string): Promise<ChannelRecord[]> {
 async function dispatchWebhook(channel: ChannelRecord, envelope: Record<string, unknown>) {
   const body = JSON.stringify(envelope);
   const secret = channel.secret ?? process.env.WEBHOOK_SECRET ?? "";
-  const sig = crypto.createHmac("sha256", secret).update(body).digest("hex");
+  const sig = await createHmacSignature(secret, body);
   const timeoutMs = normalizeTimeout(process.env.WEBHOOK_TIMEOUT_MS, 8000);
 
   const controller = new AbortController();
@@ -159,7 +175,7 @@ async function safeReadBody(res: Response) {
   }
 }
 
-let cachedTransporter: nodemailer.Transporter<SMTPTransport.SentMessageInfo> | null | undefined;
+let cachedTransporter: unknown | null | undefined;
 
 async function dispatchEmail(channel: ChannelRecord, envelope: NotificationEnvelope) {
   const transporter = await getEmailTransporter();
@@ -195,41 +211,16 @@ async function dispatchEmail(channel: ChannelRecord, envelope: NotificationEnvel
 async function getEmailTransporter() {
   if (cachedTransporter !== undefined) return cachedTransporter;
 
-  const host = process.env.EMAIL_SMTP_HOST;
-  const portRaw = process.env.EMAIL_SMTP_PORT ?? "587";
-  const user = process.env.EMAIL_SMTP_USER;
-  const pass = process.env.EMAIL_SMTP_PASS;
-
-  if (!host) {
-    console.warn("[Email] EMAIL_SMTP_HOST missing, disable email notifications");
+  // Email notifications disabled in edge runtime
+  if (EMAIL_DISABLED_IN_EDGE_RUNTIME) {
+    console.warn("[Email] email notifications disabled in edge runtime, use webhook/slack instead");
     cachedTransporter = null;
     return cachedTransporter;
   }
 
-  const port = Number(portRaw);
-  const secure = process.env.EMAIL_SMTP_SECURE === "true" || port === 465;
-
-  const auth = user
-    ? {
-        user,
-        pass: pass ?? undefined,
-      }
-    : undefined;
-
-  cachedTransporter = nodemailer.createTransport({
-    host,
-    port: Number.isFinite(port) ? port : 587,
-    secure,
-    auth,
-  });
-
-  try {
-    await cachedTransporter.verify();
-  } catch (error) {
-    console.error("[Email] transporter verify failed", error);
-    cachedTransporter = null;
-  }
-
+  // This code path should never be reached when EMAIL_DISABLED_IN_EDGE_RUNTIME is true
+  console.error("[Email] unexpected code path - email should be disabled in edge runtime");
+  cachedTransporter = null;
   return cachedTransporter;
 }
 

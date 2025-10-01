@@ -34,7 +34,7 @@ async function getScansData(params: {
 
     // 获取总数
     const totalResult = await db
-        .select({ count: count() })
+        .select({ count: count(scans.id) })
         .from(scans)
         .innerJoin(sites, eq(scans.siteId, sites.id))
         .where(and(...conditions));
