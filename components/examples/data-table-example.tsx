@@ -3,7 +3,7 @@
 import { DataTable, createColumn, columnRenderers } from "@/components/ui/data-table";
 
 // 示例数据类型
-interface ExampleUser {
+interface ExampleUser extends Record<string, unknown> {
   id: string;
   name: string;
   email: string;
@@ -102,7 +102,7 @@ export function DataTableExample() {
     createColumn<ExampleUser>({
       key: "actions",
       title: "操作",
-      render: (user) => (
+      render: () => (
         <div className="flex items-center space-x-2">
           <button className="text-primary hover:underline text-sm">
             编辑

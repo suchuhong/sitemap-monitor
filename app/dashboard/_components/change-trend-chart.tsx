@@ -454,10 +454,3 @@ function buildAreaPath(values: number[], projectX: (i: number) => number, projec
 
   return `${smoothPath} L${lastX},${baseY} L${firstX},${baseY} Z`;
 }
-
-// 保留原函数以防其他地方使用
-function buildPath(values: number[], projectX: (i: number) => number, projectY: (v: number) => number) {
-  return values
-    .map((value, index) => `${index === 0 ? "M" : "L"}${projectX(index)},${projectY(Math.max(0, value))}`)
-    .join(" ");
-}

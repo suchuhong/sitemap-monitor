@@ -7,16 +7,17 @@ import {
   type ControllerRenderProps,
   type FieldPath,
   type FieldValues,
-  type FieldState,
+  type ControllerFieldState,
   type UseFormStateReturn,
+  type UseFormReturn,
 } from "react-hook-form";
 import { Label } from "./label";
 import { cn } from "@/lib/utils";
 
-export function Form({
+export function Form<TFieldValues extends FieldValues>({
   children,
   ...props
-}: React.ComponentProps<typeof FormProvider>) {
+}: UseFormReturn<TFieldValues> & { children: React.ReactNode }) {
   return <FormProvider {...props}>{children}</FormProvider>;
 }
 
@@ -46,7 +47,7 @@ type RenderArgs<
   TName extends FieldPath<TFieldValues>,
 > = {
   field: ControllerRenderProps<TFieldValues, TName>;
-  fieldState: FieldState;
+  fieldState: ControllerFieldState;
   formState: UseFormStateReturn<TFieldValues>;
 };
 
@@ -58,7 +59,7 @@ export function FormField<
   render,
 }: {
   name: TName;
-  render: (args: RenderArgs<TFieldValues, TName>) => React.ReactNode;
+  render: (args: RenderArgs<TFieldValues, TName>) => React.ReactElement;
 }) {
   const methods = useFormContext<TFieldValues>();
   return (

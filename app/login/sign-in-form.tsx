@@ -2,11 +2,11 @@
 
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
-import { signInAction } from "@/app/(actions)/auth";
+import { signInAction, type SignInState } from "@/app/(actions)/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-const initialState = { error: "" } as const;
+const initialState: SignInState = { error: "" };
 
 export function LoginForm({ redirectTo }: { redirectTo: string }) {
   const [state, formAction] = useActionState(signInAction, initialState);

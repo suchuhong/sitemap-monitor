@@ -3,14 +3,14 @@
 import { redirect } from "next/navigation";
 import { createUserSession, clearSession } from "@/lib/auth/session";
 
-type SignInState = {
+export type SignInState = {
   error?: string;
 };
 
 export async function signInAction(
-  _prevState: SignInState | undefined,
+  _prevState: SignInState,
   formData: FormData,
-): Promise<SignInState | void> {
+): Promise<SignInState> {
   const rawEmail = formData.get("email");
   const email = typeof rawEmail === "string" ? rawEmail : "";
   const redirectInput = formData.get("redirect");
@@ -26,6 +26,7 @@ export async function signInAction(
   }
 
   redirect(redirectTarget);
+  return { error: "" };
 }
 
 export async function signOutAction() {

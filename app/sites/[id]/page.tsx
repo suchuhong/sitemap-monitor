@@ -302,7 +302,7 @@ export default async function SiteDetailPage({
                 <svg className="inline h-3 w-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                统计基于最近一次扫描（共 {summary.activity.total} 个 URL），可在下方"最近扫描"中查看详情。
+                统计基于最近一次扫描（共 {summary.activity.total} 个 URL），可在下方 &quot;最近扫描&quot; 中查看详情。
               </p>
             </div>
           </CardContent>
@@ -487,5 +487,4 @@ function statusBadgeVariant(status: string): BadgeProps["variant"] {
   if (status === "failed") return "removed";
   return "default";
 }
-
 

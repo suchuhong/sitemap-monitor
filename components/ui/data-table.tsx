@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import NextLink from "next/link";
 import { cn } from "@/lib/utils";
 import { Pagination, PageSizeSelector, PageJumper } from "@/components/ui/pagination";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -39,7 +40,7 @@ interface DataTableProps<T> {
   showPageJumper?: boolean;
 }
 
-export function DataTable<T extends Record<string, any>>({
+export function DataTable<T extends Record<string, unknown>>({
   data,
   columns,
   currentPage,
@@ -115,23 +116,31 @@ export function DataTable<T extends Record<string, any>>({
               </tr>
             </thead>
             <tbody>
-              {data.map((item, index) => (
-                <tr
-                  key={item.id || index}
-                  className="border-b last:border-0 hover:bg-muted/50 transition-colors"
-                >
-                  {columns.map((column) => (
-                    <td
-                      key={column.key}
-                      className={cn("p-4", column.className)}
-                    >
-                      {column.render
-                        ? column.render(item, index)
-                        : item[column.key]?.toString() || "—"}
-                    </td>
-                  ))}
-                </tr>
-              ))}
+              {data.map((item, index) => {
+                const record = item as Record<string, unknown>;
+                const rowKey = record.id ?? index;
+
+                return (
+                  <tr
+                    key={String(rowKey)}
+                    className="border-b last:border-0 hover:bg-muted/50 transition-colors"
+                  >
+                    {columns.map((column) => {
+                      const value = record[column.key];
+                      const fallback = value == null ? "—" : String(value);
+
+                      return (
+                        <td
+                          key={column.key}
+                          className={cn("p-4", column.className)}
+                        >
+                          {column.render ? column.render(item, index) : fallback}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
               {data.length === 0 && emptyState && (
                 <tr>
                   <td className="p-0" colSpan={columns.length}>
@@ -218,37 +227,40 @@ export const columnRenderers = {
     ),
 
   // 简单链接列 - 使用对象属性
-  linkByKey: <T extends Record<string, any>>(
+  linkByKey: <T extends Record<string, unknown>>(
     hrefKey: keyof T, 
     textKey: keyof T, 
     className?: string
-  ) => 
-    (item: T) => (
-      <a 
-        href={item[hrefKey]?.toString() || "#"} 
-        className={cn("text-primary hover:underline underline-offset-4", className)}
-      >
-        {item[textKey]?.toString() || "—"}
-      </a>
-    ),
+  ) =>
+    (item: T) => {
+      const hrefValue = item[hrefKey];
+      const textValue = item[textKey];
+      const href = hrefValue == null ? "#" : String(hrefValue);
+      const text = textValue == null ? "—" : String(textValue);
+      return (
+        <a
+          href={href}
+          className={cn("text-primary hover:underline underline-offset-4", className)}
+        >
+          {text}
+        </a>
+      );
+    },
 
   // 内部链接（使用 Next.js Link）
   internalLink: <T,>(
     getHref: (item: T) => string, 
     getText: (item: T) => string, 
     className?: string
-  ) => 
-    (item: T) => {
-      const Link = require("next/link").default;
-      return (
-        <Link 
-          href={getHref(item)} 
-          className={cn("text-primary hover:underline underline-offset-4", className)}
-        >
-          {getText(item)}
-        </Link>
-      );
-    },
+  ) =>
+    (item: T) => (
+      <NextLink
+        href={getHref(item)}
+        className={cn("text-primary hover:underline underline-offset-4", className)}
+      >
+        {getText(item)}
+      </NextLink>
+    ),
 
   // 状态列
   status: <T,>(getStatus: (item: T) => "success" | "error" | "warning" | "info" | "pending") =>

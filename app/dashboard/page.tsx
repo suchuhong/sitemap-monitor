@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { resolveDb } from "@/lib/db";
 import { sites, changes, scans } from "@/lib/drizzle/schema";
-import { sql, gte, desc, eq, and, count } from "drizzle-orm";
+import { gte, eq, and } from "drizzle-orm";
 import { requireUser } from "@/lib/auth/session";
 import { ChangeTrendChart, type ChangeTrendPoint } from "./_components/change-trend-chart";
 
@@ -16,7 +16,6 @@ export default async function Page() {
     .select()
     .from(sites)
     .where(eq(sites.ownerId, user.id));
-  const siteRow = siteRows[0];
   const changeRows = await db
     .select()
     .from(changes)

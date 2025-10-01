@@ -17,19 +17,7 @@ export default async function ScanDetailPage({
   const db = resolveDb();
 
   const [scan] = await db
-    .select({
-      id: scans.id,
-      siteId: scans.siteId,
-      status: scans.status,
-      totalUrls: scans.totalUrls,
-      added: scans.added,
-      removed: scans.removed,
-      updated: scans.updated,
-      totalSitemaps: scans.totalSitemaps,
-      startedAt: scans.startedAt,
-      finishedAt: scans.finishedAt,
-      error: scans.error,
-    })
+    .select()
     .from(scans)
     .where(eq(scans.id, id))
     .limit(1);
@@ -37,26 +25,28 @@ export default async function ScanDetailPage({
   if (!scan) notFound();
 
   const [site] = await db
-    .select({ id: sites.id, rootUrl: sites.rootUrl })
+    .select()
     .from(sites)
     .where(eq(sites.id, scan.siteId))
     .limit(1);
 
-  const sitemapList = await db
-    .select({ id: sitemaps.id, url: sitemaps.url })
+  const sitemapRows = await db
+    .select()
     .from(sitemaps)
     .where(eq(sitemaps.siteId, scan.siteId));
+  const sitemapList = sitemapRows.map((row) => ({ id: row.id, url: row.url }));
 
-  const changeList = await db
-    .select({
-      id: changes.id,
-      type: changes.type,
-      detail: changes.detail,
-      occurredAt: changes.occurredAt,
-    })
+  const changeRows = await db
+    .select()
     .from(changes)
     .where(eq(changes.scanId, scan.id))
     .orderBy(desc(changes.occurredAt));
+  const changeList = changeRows.map((row) => ({
+    id: row.id,
+    type: row.type,
+    detail: row.detail,
+    occurredAt: row.occurredAt,
+  }));
 
   return (
     <div className="container mx-auto space-y-6 py-8">

@@ -32,7 +32,7 @@ export function NewSiteForm() {
   return (
     <div className="max-w-xl">
       <h1 className="mb-4 text-lg font-semibold">新增站点</h1>
-      <Form {...form as any}>
+      <Form {...form}>
         <form
           className="space-y-4"
           onSubmit={form.handleSubmit(async (values) => {

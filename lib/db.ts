@@ -6,20 +6,21 @@ import type { D1Database } from "@cloudflare/workers-types";
 type LibSQLDatabase = ReturnType<typeof drizzleLibSQL>;
 type D1DatabaseClient = ReturnType<typeof drizzleD1>;
 
-export type DatabaseClient = LibSQLDatabase | D1DatabaseClient;
+export type DatabaseClient = LibSQLDatabase & D1DatabaseClient;
 
 type D1Binding = {
   DB: D1Database;
 };
 
 const globalForDb = globalThis as typeof globalThis & {
-  __libsqlDb?: LibSQLDatabase;
-  __d1Db?: D1DatabaseClient;
+  __libsqlDb?: DatabaseClient;
+  __d1Db?: DatabaseClient;
 };
 
 export function resolveDb(bindingEnv?: D1Binding): DatabaseClient {
   if (bindingEnv?.DB) {
-    if (!globalForDb.__d1Db) globalForDb.__d1Db = drizzleD1(bindingEnv.DB);
+    if (!globalForDb.__d1Db)
+      globalForDb.__d1Db = drizzleD1(bindingEnv.DB) as DatabaseClient;
     return globalForDb.__d1Db;
   }
 
@@ -34,7 +35,7 @@ export function resolveDb(bindingEnv?: D1Binding): DatabaseClient {
       url,
       authToken: process.env.DB_AUTH_TOKEN,
     });
-    globalForDb.__libsqlDb = drizzleLibSQL(client);
+    globalForDb.__libsqlDb = drizzleLibSQL(client) as DatabaseClient;
   }
 
   return globalForDb.__libsqlDb;
