@@ -11,22 +11,38 @@ export type ChangeListItem = {
 
 export function ChangeList({ items }: { items: ChangeListItem[] }) {
   if (items.length === 0) {
-    return <div className="text-slate-500">暂无变更</div>;
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        <svg className="mx-auto h-12 w-12 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+        </svg>
+        <p>暂无变更记录</p>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-3 text-sm">
       {items.map((item) => (
-        <div key={item.id} className="rounded-xl border p-3 space-y-2">
-          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-            <span>{formatDateTime(item.occurredAt, { includeSeconds: true })}</span>
-            <Badge variant={badgeVariant(item.type)}>{typeLabel(item.type)}</Badge>
+        <div key={item.id} className="rounded-lg border p-4 space-y-3 bg-background/50 hover:bg-background/80 transition-colors">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs text-muted-foreground">
+              {formatDateTime(item.occurredAt, { includeSeconds: true })}
+            </span>
+            <Badge variant={badgeVariant(item.type)} className="font-medium">
+              {typeLabel(item.type)}
+            </Badge>
           </div>
-          <div className="break-words text-sm text-foreground">
+          <div className="break-words text-sm text-foreground p-3 rounded bg-muted/50 border">
             {item.detail ?? "—"}
           </div>
           {item.source && (
-            <div className="text-xs text-muted-foreground">来源：{item.source}</div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>来源：{item.source}</span>
+            </div>
           )}
         </div>
       ))}
