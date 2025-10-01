@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import type { Metadata } from "next";
 
 
+
 export const metadata: Metadata = {
     title: "博客文章列表 - Sitemap Monitor",
     description: "浏览所有SEO优化和网站监控相关的博客文章",

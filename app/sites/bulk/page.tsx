@@ -7,8 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { performBulkAction } from "./actions";
 import { getCfBindingEnvSafely } from "@/lib/cf";
-import { Input } from "@/components/ui/input";
 
+export const dynamic = "force-dynamic";
 export const dynamic = "force-dynamic";
 
 type SiteItem = {

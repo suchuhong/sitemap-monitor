@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Metadata } from "next";
 
+export const runtime = 'edge';
+
 
 export const metadata: Metadata = {
   title: "专业的网站地图监控与SEO优化平台 - Sitemap Monitor",

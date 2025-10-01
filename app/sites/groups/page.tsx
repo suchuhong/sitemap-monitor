@@ -7,9 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { createGroupAction, updateGroupAction } from "./actions";
-import { getCfBindingEnvSafely } from "@/lib/cf";
 import { DeleteGroupButton } from "./delete-group-button";
 
+export const dynamic = "force-dynamic";
 export const dynamic = "force-dynamic";
 
 export default async function SiteGroupsPage({

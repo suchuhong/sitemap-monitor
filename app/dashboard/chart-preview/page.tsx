@@ -2,7 +2,6 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ChartPreview } from "../_components/chart-preview";
 
-export const runtime = 'edge';
 
 export default function ChartPreviewPage() {
   return (

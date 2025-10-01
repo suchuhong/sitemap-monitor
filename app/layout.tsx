@@ -61,7 +61,6 @@ export const metadata: Metadata = {
   },
 };
 
-// export const runtime = "edge"; // Disabled for better-sqlite3 compatibility
 
 export default async function RootLayout({
   children,

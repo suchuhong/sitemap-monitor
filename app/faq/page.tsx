@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Metadata } from "next";
 
 
+
 export const metadata: Metadata = {
   title: "常见问题 - Sitemap Monitor网站地图监控平台",
   description: "Sitemap Monitor常见问题解答：如何监控网站地图、SEO优化技巧、网站监控设置、故障排除等。专业的技术支持，帮助您更好地使用网站地图监控服务。",

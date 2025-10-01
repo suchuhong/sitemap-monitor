@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "if [ \"$NOP_BUILD\" = \"1\" ]; then next build; else NOP_BUILD=1 pnpm exec next-on-pages; fi",
+    "build": "if [ \"$NOP_BUILD\" = \"1\" ]; then next build; else NEXT_RUNTIME_EDGE=1 NOP_BUILD=1 pnpm exec next-on-pages; fi",
     "start": "next start",
     "lint": "eslint .",
     "db:generate": "drizzle-kit generate",

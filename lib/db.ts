@@ -27,13 +27,11 @@ const globalForDb = globalThis as typeof globalThis & {
 
 function detectEdgeRuntime(hint?: "edge" | "node") {
   if (hint) return hint === "edge";
-  // Next.js Edge has no process.cwd; in Workers it’s undefined entirely.
-  // Keep detection conservative and side-effect free.
+  // Prefer robust detection used by next-on-pages: Node sets process.release.name === 'node'
+  // In Edge/Workers this is absent or different
   // eslint-disable-next-line no-restricted-globals
-  const hasProcess = typeof process !== "undefined";
-  // If process exists but cwd is missing, we’re likely on Edge.
-  // If process is undefined, also Edge.
-  return !hasProcess || !(hasProcess && typeof (process as any).cwd === "function");
+  const isNode = typeof process !== "undefined" && (process as any)?.release?.name === "node";
+  return !isNode;
 }
 
 /**
@@ -52,16 +50,11 @@ export function resolveDb(opts: ResolveDbOpts = {}): DatabaseClient {
     return globalForDb.__d1Db;
   }
 
-  const isEdge = detectEdgeRuntime(runtimeHint);
+// Detect Edge runtime based on hint or environment
+  const useEdge = detectEdgeRuntime(runtimeHint);
 
   // 2) Edge path: strictly require D1 binding to avoid bundling libsql clients in Pages build
-  if (isEdge) {
-    if (bindingEnv?.DB) {
-      if (!globalForDb.__d1Db) {
-        globalForDb.__d1Db = drizzleD1(bindingEnv.DB);
-      }
-      return globalForDb.__d1Db;
-    }
+  if (useEdge) {
     // Do not import any libsql client on Edge to prevent bundling non-JS assets in Pages builds
     throw new Error(
       "Edge runtime: database not available. Provide a Cloudflare D1 binding (env.DB)."
@@ -80,24 +73,19 @@ export function resolveDb(opts: ResolveDbOpts = {}): DatabaseClient {
       );
     }
 
-    // Support local file DBs on Node only
-    if (url.startsWith("file:")) {
-      // Normalize `file:` to `file://` with an absolute path
-      let filePath = url.replace("file:", "");
-      if (filePath.startsWith("./")) {
-        filePath = `${process.cwd()}/${filePath.slice(2)}`;
-      }
-      if (!filePath.startsWith("/")) {
-        // relative path without ./ — anchor to cwd
-        filePath = `${process.cwd()}/${filePath}`;
-      }
-      url = `file://${filePath}`;
-      // Optional: console.log("Using local SQLite file:", url);
-    }
+    // Support local file DBs on Node only: leave file: URL as-is to avoid Node API usage in mixed contexts
+    // If you need absolute paths, set DB_URL to an absolute file:///... in your .env
+    // Optional: console.log("Using local SQLite file:", url);
 
-    // Use eval('require') to avoid bundlers (Edge build) from statically including @libsql/client
-    // eslint-disable-next-line @typescript-eslint/no-implied-eval
-    const nodeRequire = (0, eval)("require") as (id: string) => any;
+    // Prefer the webpack escape hatch to access real Node require in server env
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const nodeRequire = (typeof __non_webpack_require__ !== 'undefined'
+      // @ts-expect-error non standard global defined by webpack
+      ? (__non_webpack_require__ as (id: string) => any)
+      : undefined);
+    if (!nodeRequire) {
+      throw new Error('Node runtime: require is not available in this context.');
+    }
     const { createClient } = nodeRequire("@libsql/client"); // Node client
     const client = createClient({ url, authToken });
     globalForDb.__libsqlDb = drizzleLibSQL(client);
