@@ -117,6 +117,7 @@ Thumbs.db
 
 # Vercel
 .vercel
+.wrangler/
 
 # Turbo
 .turbo

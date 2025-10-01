@@ -1,6 +1,6 @@
 import { XMLParser } from "fast-xml-parser";
 import { randomUUID } from "crypto";
-import { db } from "@/lib/db";
+import { resolveDb } from "@/lib/db";
 import { sites, sitemaps, urls } from "@/lib/drizzle/schema";
 import { and, eq } from "drizzle-orm";
 import { fetchWithCompression } from "./net";
@@ -22,6 +22,7 @@ export async function discover({
   ownerId: string;
   tags?: string[];
 }) {
+  const db = resolveDb();
   const robotsUrl = new URL("/robots.txt", rootUrl).toString();
   const smCandidates = await gatherInitialSitemaps(rootUrl, robotsUrl);
   const discovered = await collectSitemaps(smCandidates);
@@ -91,6 +92,7 @@ export async function rediscoverSite({
   rootUrl: string;
   tags?: string[];
 }) {
+  const db = resolveDb();
   const robotsUrl = new URL("/robots.txt", rootUrl).toString();
   const smCandidates = await gatherInitialSitemaps(rootUrl, robotsUrl);
   const discovered = await collectSitemaps(smCandidates);

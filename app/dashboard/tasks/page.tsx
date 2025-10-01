@@ -2,7 +2,7 @@ import { StatusIndicator } from "@/components/ui/status-indicator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDateTime } from "@/lib/datetime";
 import { requireUser } from "@/lib/auth/session";
-import { db } from "@/lib/db";
+import { resolveDb } from "@/lib/db";
 import { scans, sites, changes } from "@/lib/drizzle/schema";
 import { desc, eq } from "drizzle-orm";
 
@@ -34,43 +34,48 @@ type ChangeRecord = {
 
 export default async function TasksPage() {
   const user = await requireUser({ redirectTo: "/dashboard/tasks" });
+  const db = resolveDb();
 
-  const [scanRows, changeRows] = await Promise.all([
+  const [rawScanRows, rawChangeRows] = await Promise.all([
     db
-      .select({
-        id: scans.id,
-        siteId: scans.siteId,
-        rootUrl: sites.rootUrl,
-        status: scans.status,
-        totalUrls: scans.totalUrls,
-        added: scans.added,
-        removed: scans.removed,
-        updated: scans.updated,
-        startedAt: scans.startedAt,
-        finishedAt: scans.finishedAt,
-        error: scans.error,
-      })
+      .select()
       .from(scans)
       .innerJoin(sites, eq(scans.siteId, sites.id))
       .where(eq(sites.ownerId, user.id))
       .orderBy(desc(scans.startedAt))
-      .limit(50) as Promise<ScanWithSite[]>,
+      .limit(50),
     db
-      .select({
-        id: changes.id,
-        siteId: changes.siteId,
-        rootUrl: sites.rootUrl,
-        type: changes.type,
-        detail: changes.detail,
-        occurredAt: changes.occurredAt,
-        source: changes.source,
-      })
+      .select()
       .from(changes)
       .innerJoin(sites, eq(changes.siteId, sites.id))
       .where(eq(sites.ownerId, user.id))
       .orderBy(desc(changes.occurredAt))
-      .limit(100) as Promise<ChangeRecord[]>,
+      .limit(100),
   ]);
+
+  const scanRows: ScanWithSite[] = rawScanRows.map(row => ({
+    id: row.scans.id,
+    siteId: row.scans.siteId,
+    rootUrl: row.sites.rootUrl,
+    status: row.scans.status,
+    totalUrls: row.scans.totalUrls,
+    added: row.scans.added,
+    removed: row.scans.removed,
+    updated: row.scans.updated,
+    startedAt: row.scans.startedAt,
+    finishedAt: row.scans.finishedAt,
+    error: row.scans.error,
+  }));
+
+  const changeRows: ChangeRecord[] = rawChangeRows.map(row => ({
+    id: row.changes.id,
+    siteId: row.changes.siteId,
+    rootUrl: row.sites.rootUrl,
+    type: row.changes.type,
+    detail: row.changes.detail,
+    occurredAt: row.changes.occurredAt,
+    source: row.changes.source,
+  }));
 
   const statusCounts = scanRows.reduce(
     (acc, scan) => {

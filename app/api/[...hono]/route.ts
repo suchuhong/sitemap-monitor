@@ -6,7 +6,7 @@ import { z } from "zod";
 import { discover, rediscoverSite } from "@/lib/logic/discover";
 import { enqueueScan, cronScan } from "@/lib/logic/scan";
 import { getSiteDetail } from "@/lib/logic/site-detail";
-import { db } from "@/lib/db";
+import { resolveDb, type DatabaseClient } from "@/lib/db";
 import {
   users,
   sites,
@@ -20,12 +20,15 @@ import {
 } from "@/lib/drizzle/schema";
 import { desc, and, eq, gte, lte } from "drizzle-orm";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/session";
-import { logEvent } from "@/lib/observability/logger";
 import type { SQL } from "drizzle-orm";
+import type { D1Database } from "@cloudflare/workers-types";
 
 export const config = { runtime: "nodejs" };
 
-const app = new Hono<{ Variables: { userId: string; userEmail?: string; requestId: string } }>().basePath("/api");
+const app = new Hono<{
+  Bindings: { DB: D1Database };
+  Variables: { userId: string; userEmail?: string; requestId: string; db: DatabaseClient };
+}>().basePath("/api");
 
 app.post("/cron/scan", async (c) => {
   const expectedToken = process.env.CRON_TOKEN;
@@ -42,6 +45,7 @@ app.post("/cron/scan", async (c) => {
     }
   }
 
+  resolveDb(c.env);
   const result = await cronScan();
   return c.json(result);
 });
@@ -50,16 +54,19 @@ app.use("*", async (c, next) => {
   const sessionId = getCookie(c, SESSION_COOKIE_NAME);
   if (!sessionId) return c.json({ error: "unauthorized" }, 401);
 
-  const [user] = await db
-    .select({ id: users.id, email: users.email })
+  const db = resolveDb(c.env);
+  const userRows = await db
+    .select()
     .from(users)
     .where(eq(users.id, sessionId))
     .limit(1);
+  const user = userRows[0] ? { id: userRows[0].id, email: userRows[0].email } : undefined;
 
   if (!user) return c.json({ error: "unauthorized" }, 401);
 
   c.set("userId", user.id);
   c.set("userEmail", user.email);
+  c.set("db", db);
   await next();
 });
 
@@ -80,19 +87,22 @@ app.post("/sites", async (c) => {
 
 app.get("/sites", async (c) => {
   const ownerId = c.get("userId");
-  const rows = await db
-    .select({
-      id: sites.id,
-      rootUrl: sites.rootUrl,
-      robotsUrl: sites.robotsUrl,
-      enabled: sites.enabled,
-      tags: sites.tags,
-      createdAt: sites.createdAt,
-      updatedAt: sites.updatedAt,
-    })
+  const db = c.get("db") ?? resolveDb(c.env);
+  const rawRows = await db
+    .select()
     .from(sites)
     .where(eq(sites.ownerId, ownerId))
     .orderBy(desc(sites.createdAt));
+
+  const rows = rawRows.map(row => ({
+    id: row.id,
+    rootUrl: row.rootUrl,
+    robotsUrl: row.robotsUrl,
+    enabled: row.enabled,
+    tags: row.tags,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  }));
 
   return c.json({
     sites: rows.map((row) => ({
@@ -105,6 +115,7 @@ app.get("/sites", async (c) => {
 app.patch("/sites/:id", async (c) => {
   const id = c.req.param("id");
   const ownerId = c.get("userId");
+  const db = c.get("db") ?? resolveDb(c.env);
   const schema = z
     .object({
       rootUrl: z.string().url().optional(),
@@ -120,11 +131,12 @@ app.patch("/sites/:id", async (c) => {
   const body = schema.parse(await c.req.json());
   const normalizedTags = normalizeTagsList(body.tags);
 
-  const [existing] = await db
-    .select({ ownerId: sites.ownerId })
+  const existingRows = await db
+    .select()
     .from(sites)
     .where(eq(sites.id, id))
     .limit(1);
+  const existing = existingRows[0];
   if (!existing || existing.ownerId !== ownerId)
     return c.json({ error: "not found" }, 404);
 
@@ -154,11 +166,12 @@ app.patch("/sites/:id", async (c) => {
     if (!body.groupId) {
       updatePayload.groupId = null;
     } else {
-      const [group] = await db
-        .select({ ownerId: siteGroups.ownerId })
+      const groupRows = await db
+        .select()
         .from(siteGroups)
         .where(eq(siteGroups.id, body.groupId))
         .limit(1);
+      const group = groupRows[0];
       if (!group || group.ownerId !== ownerId)
         return c.json({ error: "group not found" }, 404);
       updatePayload.groupId = body.groupId;
@@ -178,11 +191,13 @@ app.patch("/sites/:id", async (c) => {
 app.delete("/sites/:id", async (c) => {
   const id = c.req.param("id");
   const ownerId = c.get("userId") as string;
-  const [existing] = await db
-    .select({ ownerId: sites.ownerId })
+  const db = c.get("db") ?? resolveDb(c.env);
+  const existingRows = await db
+    .select()
     .from(sites)
     .where(eq(sites.id, id))
     .limit(1);
+  const existing = existingRows[0];
   if (!existing || existing.ownerId !== ownerId)
     return c.json({ error: "not found" }, 404);
 
@@ -217,16 +232,19 @@ function normalizeTagsList(tags?: string[]) {
 
 app.get("/sites/export.csv", async (c) => {
   const ownerId = c.get("userId");
-  const rows = await db
-    .select({
-      id: sites.id,
-      rootUrl: sites.rootUrl,
-      robotsUrl: sites.robotsUrl,
-      createdAt: sites.createdAt,
-    })
+  const db = c.get("db") ?? resolveDb(c.env);
+  const rawRows = await db
+    .select()
     .from(sites)
     .where(eq(sites.ownerId, ownerId))
     .orderBy(desc(sites.createdAt));
+    
+  const rows = rawRows.map(row => ({
+    id: row.id,
+    rootUrl: row.rootUrl,
+    robotsUrl: row.robotsUrl,
+    createdAt: row.createdAt,
+  }));
   const csv = ["id,rootUrl,robotsUrl,createdAt"]
     .concat(
       rows.map((r) =>
@@ -245,7 +263,7 @@ app.get("/sites/export.csv", async (c) => {
 app.get("/sites/:id", async (c) => {
   const id = c.req.param("id");
   const ownerId = c.get("userId");
-
+  resolveDb(c.env);
   const detail = await getSiteDetail({ siteId: id, ownerId });
   if (!detail) return c.json({ error: "not found" }, 404);
 
@@ -255,11 +273,13 @@ app.get("/sites/:id", async (c) => {
 app.post("/sites/:id/scan", async (c) => {
   const id = c.req.param("id");
   const ownerId = c.get("userId");
-  const [site] = await db
-    .select({ id: sites.id })
+  const db = c.get("db") ?? resolveDb(c.env);
+  const siteRows = await db
+    .select()
     .from(sites)
     .where(and(eq(sites.id, id), eq(sites.ownerId, ownerId)))
     .limit(1);
+  const site = siteRows[0];
   if (!site) return c.json({ error: "not found" }, 404);
   const { scanId } = await enqueueScan(id);
   return c.json({ ok: true, status: "queued", scanId });
@@ -288,11 +308,13 @@ app.post("/sites/:id/webhooks", async (c) => {
   if (!targetUrl) return c.json({ error: "targetUrl required" }, 400);
   const siteId = c.req.param("id");
   const ownerId = c.get("userId");
-  const [site] = await db
-    .select({ id: sites.id })
+  const db = c.get("db") ?? resolveDb(c.env);
+  const siteRows = await db
+    .select()
     .from(sites)
     .where(and(eq(sites.id, siteId), eq(sites.ownerId, ownerId)))
     .limit(1);
+  const site = siteRows[0];
   if (!site) return c.json({ error: "not found" }, 404);
   await db
     .insert(webhooks)
@@ -304,11 +326,13 @@ app.post("/sites/:id/test-webhook", async (c) => {
   const { notifyChange } = await import("@/lib/logic/notify");
   const siteId = c.req.param("id");
   const ownerId = c.get("userId");
-  const [site] = await db
-    .select({ id: sites.id })
+  const db = c.get("db") ?? resolveDb(c.env);
+  const siteRows = await db
+    .select()
     .from(sites)
     .where(and(eq(sites.id, siteId), eq(sites.ownerId, ownerId)))
     .limit(1);
+  const site = siteRows[0];
   if (!site) return c.json({ error: "not found" }, 404);
   await notifyChange(siteId, {
     scanId: "test",
@@ -323,24 +347,28 @@ app.post("/sites/:id/test-webhook", async (c) => {
 app.get("/sites/:id/notifications", async (c) => {
   const siteId = c.req.param("id");
   const ownerId = c.get("userId");
+  const db = c.get("db") ?? resolveDb(c.env);
 
-  const [site] = await db
-    .select({ id: sites.id })
+  const siteRows = await db
+    .select()
     .from(sites)
     .where(and(eq(sites.id, siteId), eq(sites.ownerId, ownerId)))
     .limit(1);
+  const site = siteRows[0];
   if (!site) return c.json({ error: "not found" }, 404);
 
-  const channels = await db
-    .select({
-      id: notificationChannels.id,
-      type: notificationChannels.type,
-      target: notificationChannels.target,
-      secret: notificationChannels.secret,
-      createdAt: notificationChannels.createdAt,
-    })
+  const channelRows = await db
+    .select()
     .from(notificationChannels)
     .where(eq(notificationChannels.siteId, siteId));
+
+  const channels = channelRows.map(row => ({
+    id: row.id,
+    type: row.type,
+    target: row.target,
+    secret: row.secret,
+    createdAt: row.createdAt,
+  }));
 
   return c.json({ channels });
 });
@@ -348,12 +376,14 @@ app.get("/sites/:id/notifications", async (c) => {
 app.post("/sites/:id/notifications", async (c) => {
   const siteId = c.req.param("id");
   const ownerId = c.get("userId");
+  const db = c.get("db") ?? resolveDb(c.env);
 
-  const [site] = await db
-    .select({ id: sites.id })
+  const siteRows = await db
+    .select()
     .from(sites)
     .where(and(eq(sites.id, siteId), eq(sites.ownerId, ownerId)))
     .limit(1);
+  const site = siteRows[0];
   if (!site) return c.json({ error: "not found" }, 404);
 
   const body = await c.req.json();
@@ -382,12 +412,14 @@ app.delete("/sites/:id/notifications/:notificationId", async (c) => {
   const siteId = c.req.param("id");
   const notificationId = c.req.param("notificationId");
   const ownerId = c.get("userId");
+  const db = c.get("db") ?? resolveDb(c.env);
 
-  const [site] = await db
-    .select({ id: sites.id })
+  const siteRows = await db
+    .select()
     .from(sites)
     .where(and(eq(sites.id, siteId), eq(sites.ownerId, ownerId)))
     .limit(1);
+  const site = siteRows[0];
   if (!site) return c.json({ error: "not found" }, 404);
 
   await db
@@ -400,11 +432,13 @@ app.delete("/sites/:id/notifications/:notificationId", async (c) => {
 app.get("/sites/:id/changes.csv", async (c) => {
   const id = c.req.param("id");
   const ownerId = c.get("userId");
-  const [site] = await db
-    .select({ id: sites.id })
+  const db = c.get("db") ?? resolveDb(c.env);
+  const siteRows = await db
+    .select()
     .from(sites)
     .where(and(eq(sites.id, id), eq(sites.ownerId, ownerId)))
     .limit(1);
+  const site = siteRows[0];
   if (!site) return c.body("not found", 404);
 
   const url = new URL(c.req.url);
@@ -432,15 +466,17 @@ app.get("/sites/:id/changes.csv", async (c) => {
   let whereClause: SQL | undefined = firstFilter;
   for (const condition of restFilters) whereClause = and(whereClause!, condition);
 
-  const list = await db
-    .select({
-      type: changes.type,
-      detail: changes.detail,
-      occurredAt: changes.occurredAt,
-    })
+  const rawList = await db
+    .select()
     .from(changes)
     .where(whereClause)
     .orderBy(desc(changes.occurredAt));
+    
+  const list = rawList.map(row => ({
+    type: row.type,
+    detail: row.detail,
+    occurredAt: row.occurredAt,
+  }));
 
   const rows = [["type", "detail", "occurredAt"]].concat(
     list.map((r) => [
@@ -473,33 +509,38 @@ app.get("/sites/:id/scan-diff", async (c) => {
   const scanId = url.searchParams.get("scanId");
   if (!scanId) return c.json({ error: "scanId required" }, 400);
 
-  const [scanRow] = await db
-    .select({
-      id: scans.id,
-      siteId: scans.siteId,
-      startedAt: scans.startedAt,
-      finishedAt: scans.finishedAt,
-    })
+  const db = c.get("db") ?? resolveDb(c.env);
+  const scanRows = await db
+    .select()
     .from(scans)
     .where(eq(scans.id, scanId));
+  const scanRow = scanRows[0] ? {
+    id: scanRows[0].id,
+    siteId: scanRows[0].siteId,
+    startedAt: scanRows[0].startedAt,
+    finishedAt: scanRows[0].finishedAt,
+  } : undefined;
   if (!scanRow || scanRow.siteId !== siteId) return c.json({ error: "not found" }, 404);
 
-  const [site] = await db
-    .select({ ownerId: sites.ownerId })
+  const siteRows = await db
+    .select()
     .from(sites)
     .where(eq(sites.id, siteId))
     .limit(1);
+  const site = siteRows[0];
   if (!site || site.ownerId !== ownerId) return c.json({ error: "not found" }, 404);
 
-  const rows = await db
-    .select({
-      type: changes.type,
-      detail: changes.detail,
-      occurredAt: changes.occurredAt,
-    })
+  const rowData = await db
+    .select()
     .from(changes)
     .where(and(eq(changes.siteId, siteId), eq(changes.scanId, scanId)))
     .orderBy(desc(changes.occurredAt));
+
+  const rows = rowData.map(row => ({
+    type: row.type,
+    detail: row.detail,
+    occurredAt: row.occurredAt,
+  }));
 
   const summary = rows.reduce(
     (acc, row) => {

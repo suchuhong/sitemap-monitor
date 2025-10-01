@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth/session";
-import { db } from "@/lib/db";
+import { resolveDb } from "@/lib/db";
 import { siteGroups, sites } from "@/lib/drizzle/schema";
 import { sql, desc, eq } from "drizzle-orm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -123,6 +123,7 @@ export default async function SiteGroupsPage({
 }
 
 async function fetchGroupsWithCounts(ownerId: string) {
+  const db = resolveDb();
   return await db
     .select({
       id: siteGroups.id,
@@ -141,6 +142,7 @@ async function fetchGroupsWithCounts(ownerId: string) {
 }
 
 async function countSites(ownerId: string) {
+  const db = resolveDb();
   const [row] = await db
     .select({ count: sql<number>`count(*)` })
     .from(sites)

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth/session";
-import { db } from "@/lib/db";
+import { resolveDb } from "@/lib/db";
 import { siteGroups, sites } from "@/lib/drizzle/schema";
 import { eq, sql } from "drizzle-orm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -61,6 +61,7 @@ export default async function BulkSitesPage({
 }
 
 async function fetchSites(ownerId: string) {
+  const db = resolveDb();
   return await db
     .select({
       id: sites.id,
@@ -76,6 +77,7 @@ async function fetchSites(ownerId: string) {
 }
 
 async function fetchGroups(ownerId: string) {
+  const db = resolveDb();
   return await db
     .select({ id: siteGroups.id, name: siteGroups.name })
     .from(siteGroups)

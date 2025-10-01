@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { db } from "@/lib/db";
+import { resolveDb } from "@/lib/db";
 import { observabilityLogs } from "@/lib/drizzle/schema";
 
 type LogLevel = "info" | "warning" | "error";
@@ -20,6 +20,7 @@ export async function logEvent({
   level?: LogLevel;
 }) {
   try {
+    const db = resolveDb();
     await db.insert(observabilityLogs).values({
       id: randomUUID(),
       type,

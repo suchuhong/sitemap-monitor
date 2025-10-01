@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth/session";
-import { db } from "@/lib/db";
+import { resolveDb } from "@/lib/db";
 import { siteGroups, sites } from "@/lib/drizzle/schema";
 import { and, eq, inArray } from "drizzle-orm";
 
@@ -11,6 +11,7 @@ type BulkAction = "assignGroup" | "clearGroup" | "appendTag" | "removeTag" | "re
 
 export async function performBulkAction(formData: FormData) {
   const user = await requireUser({ redirectTo: "/sites/bulk" });
+  const db = resolveDb();
   const siteIds = formData.getAll("siteId").map(String).filter(Boolean);
   if (!siteIds.length) redirect(`/sites/bulk?error=no_selection`);
 
@@ -70,6 +71,7 @@ async function mutateTags(
   ownerId: string,
   updater: (tags: string[]) => string[],
 ) {
+  const db = resolveDb();
   const rows = await db
     .select({ id: sites.id, tags: sites.tags })
     .from(sites)

@@ -14,6 +14,7 @@ Sitemap Monitor 是一个基于 Next.js 15 的示例项目，用于接入站点�
 - [批量导入指南](#批量导入指南)
 - [API 说明](#api-说明)
 - [数据库结构](#数据库结构)
+- [Cloudflare 免费部署](#cloudflare-免费部署)
 - [开发提示](#开发提示)
 
 ## 功能概览
@@ -251,6 +252,10 @@ Sitemap Monitor 是一个基于 Next.js 15 的示例项目，用于接入站点�
 - 外键保证站点/URL/变更之间的关联；示例中会为 `demo-user` 自动创建一个用户以满足约束。
 
 迁移文件存放于 `drizzle/`，初始迁移为 `0000_sleepy_stone_men.sql`。
+
+## Cloudflare 免费部署
+
+如果需要依托 Cloudflare Free 套餐上线项目并启用 Cloudflare D1 数据库、Workers Cron 定时触发 `/api/cron/scan`，请参考 `docs/cloudflare-deployment.md`。文档涵盖 D1 绑定与迁移、Pages 环境变量、运行时代码适配以及 Cron Worker 示例脚本，可按需调优。
 
 ## 开发提示
 

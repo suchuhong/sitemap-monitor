@@ -1,6 +1,6 @@
 import { XMLParser } from "fast-xml-parser";
 import { randomUUID } from "crypto";
-import { db } from "@/lib/db";
+import { resolveDb } from "@/lib/db";
 import { sitemaps, urls, scans, changes, sites } from "@/lib/drizzle/schema";
 import { eq } from "drizzle-orm";
 import { fetchWithCompression, retry } from "./net";
@@ -20,6 +20,7 @@ const scanQueue: ScanJob[] = [];
 let processing = false;
 
 export async function cronScan() {
+  const db = resolveDb();
   const now = Date.now();
   const activeSites = await db
     .select({
@@ -67,6 +68,7 @@ export async function cronScan() {
 }
 
 export async function runScanNow(siteId: string) {
+  const db = resolveDb();
   const scanId = randomUUID();
   await db
     .insert(scans)
@@ -75,6 +77,7 @@ export async function runScanNow(siteId: string) {
 }
 
 export async function enqueueScan(siteId: string) {
+  const db = resolveDb();
   const scanId = randomUUID();
   await db
     .insert(scans)
@@ -100,6 +103,7 @@ async function processQueue() {
 }
 
 async function executeScan({ scanId, siteId }: ScanJob) {
+  const db = resolveDb();
   const startTime = new Date();
   await db
     .update(scans)
@@ -202,6 +206,7 @@ async function scanOneSitemap({
   sitemap: SitemapRow;
   scanId: string;
 }) {
+  const db = resolveDb();
   const headers: Record<string, string> = {};
   if (sm.lastEtag) headers["If-None-Match"] = sm.lastEtag;
   if (sm.lastModified) headers["If-Modified-Since"] = sm.lastModified;

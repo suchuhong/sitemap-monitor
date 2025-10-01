@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import nodemailer from "nodemailer";
 import type SMTPTransport from "nodemailer/lib/smtp-transport";
-import { db } from "@/lib/db";
+import { resolveDb } from "@/lib/db";
 import { notificationChannels, webhooks, sites } from "@/lib/drizzle/schema";
 import { eq } from "drizzle-orm";
 
@@ -27,6 +27,7 @@ type NotificationEnvelope = {
 };
 
 export async function notifyChange(siteId: string, payload: ChangePayload) {
+  const db = resolveDb();
   const siteInfo = await db
     .select({ id: sites.id, rootUrl: sites.rootUrl })
     .from(sites)
@@ -69,6 +70,7 @@ type ChannelRecord = {
 };
 
 async function loadChannels(siteId: string): Promise<ChannelRecord[]> {
+  const db = resolveDb();
   const custom = await db
     .select({
       id: notificationChannels.id,

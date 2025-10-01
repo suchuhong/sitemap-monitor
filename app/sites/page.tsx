@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { db } from "@/lib/db";
+import { resolveDb } from "@/lib/db";
 import { sites, siteGroups } from "@/lib/drizzle/schema";
 import { requireUser } from "@/lib/auth/session";
 import { sql, asc, desc, and, eq } from "drizzle-orm";
@@ -62,6 +62,7 @@ export default async function SitesPage({
   }
   const redirectTo = `/sites${redirectParams.toString() ? `?${redirectParams.toString()}` : ""}`;
   const user = await requireUser({ redirectTo });
+  const db = resolveDb();
 
   const tagParam = getParam(params, "tags", "");
   const selectedTags = tagParam
@@ -262,6 +263,7 @@ export default async function SitesPage({
 }
 
 async function fetchDistinctTags(ownerId: string) {
+  const db = resolveDb();
   const rows = await db
     .select({ tags: sites.tags })
     .from(sites)
@@ -290,6 +292,7 @@ function buildTagsWhereClause(tags: string[]) {
 }
 
 async function fetchGroups(ownerId: string) {
+  const db = resolveDb();
   const rows = await db
     .select({ id: siteGroups.id, name: siteGroups.name, color: siteGroups.color })
     .from(siteGroups)

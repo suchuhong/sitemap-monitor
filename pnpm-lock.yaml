@@ -20,9 +20,6 @@ importers:
       '@tanstack/react-table':
         specifier: ^8.19.3
         version: 8.21.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      '@types/node-cron':
-        specifier: ^3.0.11
-        version: 3.0.11
       class-variance-authority:
         specifier: ^0.7.0
         version: 0.7.1
@@ -31,7 +28,7 @@ importers:
         version: 2.1.1
       drizzle-orm:
         specifier: ^0.33.0
-        version: 0.33.0(@libsql/client@0.7.0)(@types/react@19.1.15)(react@18.3.1)
+        version: 0.33.0(@cloudflare/workers-types@4.20251001.0)(@libsql/client@0.7.0)(@types/react@19.1.15)(react@18.3.1)
       fast-xml-parser:
         specifier: ^4.4.2
         version: 4.5.3
@@ -44,9 +41,6 @@ importers:
       next-themes:
         specifier: ^0.3.0
         version: 0.3.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      node-cron:
-        specifier: ^4.2.1
-        version: 4.2.1
       nodemailer:
         specifier: ^7.0.6
         version: 7.0.6
@@ -78,6 +72,9 @@ importers:
         specifier: ^3.23.8
         version: 3.25.76
     devDependencies:
+      '@cloudflare/workers-types':
+        specifier: ^4.20251001.0
+        version: 4.20251001.0
       '@eslint/eslintrc':
         specifier: ^3.3.1
         version: 3.3.1
@@ -120,6 +117,9 @@ packages:
   '@alloc/quick-lru@5.2.0':
     resolution: {integrity: sha512-UrcABB+4bUrFABwbluTIBErXwvbsU/V7TZWfmbgJfbkwiBuziS9gxdODUyuiecfdGQ85jglMW6juS3+z5TsKLw==}
     engines: {node: '>=10'}
+
+  '@cloudflare/workers-types@4.20251001.0':
+    resolution: {integrity: sha512-MXseDjmqL1hIdQCqwHDMG8SE60W4FdwqLsofZjo/KtLH9zFcoQfZkCYyQrdfEJINiSoNJjrup7WR6KsqiFUSsg==}
 
   '@drizzle-team/brocli@0.10.2':
     resolution: {integrity: sha512-z33Il7l5dKjUgGULTqBsQBQwckHh5AbIuxhdsIxDDiZAzBOrZO6q9ogcWC65kU382AfynTfgNumVcNIjuIua6w==}
@@ -795,9 +795,6 @@ packages:
 
   '@types/json5@0.0.29':
     resolution: {integrity: sha512-dRLjCWHYg4oaA77cxO64oO+7JwCwnIzkZPdrrC71jQmQtlhM556pwKo5bUzqvZndkVbeFLIIi+9TC40JNF5hNQ==}
-
-  '@types/node-cron@3.0.11':
-    resolution: {integrity: sha512-0ikrnug3/IyneSHqCBeslAhlK2aBfYek1fGo4bP4QnZPmiqSGRK+Oy7ZMisLWkesffJvQ1cqAcBnJC+8+nxIAg==}
 
   '@types/node@24.5.2':
     resolution: {integrity: sha512-FYxk1I7wPv3K2XBaoyH2cTnocQEu8AOZ60hPbsyukMPLv5/5qr7V1i8PLHdl6Zf87I+xZXFvPCXYjiTFq+YSDQ==}
@@ -1978,10 +1975,6 @@ packages:
       sass:
         optional: true
 
-  node-cron@4.2.1:
-    resolution: {integrity: sha512-lgimEHPE/QDgFlywTd8yTR61ptugX3Qer29efeyWw2rv259HtGBNn1vZVmp8lB9uo9wC0t/AT4iGqXxia+CJFg==}
-    engines: {node: '>=6.0.0'}
-
   node-domexception@1.0.0:
     resolution: {integrity: sha512-/jKZoMpw0F8GRwl4/eLROPA3cfcXtLApP0QzLmUT/HuPCZWyB7IY9ZrMeKw2O/nFIqPQB3PVM9aYm0F312AXDQ==}
     engines: {node: '>=10.5.0'}
@@ -2596,6 +2589,8 @@ snapshots:
 
   '@alloc/quick-lru@5.2.0': {}
 
+  '@cloudflare/workers-types@4.20251001.0': {}
+
   '@drizzle-team/brocli@0.10.2': {}
 
   '@emnapi/core@1.5.0':
@@ -3070,8 +3065,6 @@ snapshots:
 
   '@types/json5@0.0.29': {}
 
-  '@types/node-cron@3.0.11': {}
-
   '@types/node@24.5.2':
     dependencies:
       undici-types: 7.12.0
@@ -3530,8 +3523,9 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  drizzle-orm@0.33.0(@libsql/client@0.7.0)(@types/react@19.1.15)(react@18.3.1):
+  drizzle-orm@0.33.0(@cloudflare/workers-types@4.20251001.0)(@libsql/client@0.7.0)(@types/react@19.1.15)(react@18.3.1):
     optionalDependencies:
+      '@cloudflare/workers-types': 4.20251001.0
       '@libsql/client': 0.7.0
       '@types/react': 19.1.15
       react: 18.3.1
@@ -4369,8 +4363,6 @@ snapshots:
     transitivePeerDependencies:
       - '@babel/core'
       - babel-plugin-macros
-
-  node-cron@4.2.1: {}
 
   node-domexception@1.0.0: {}
 

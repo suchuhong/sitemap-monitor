@@ -1,70 +1,115 @@
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { db } from "@/lib/db";
+import { resolveDb } from "@/lib/db";
 import { sites, changes, scans } from "@/lib/drizzle/schema";
-import { sql, gte, desc, eq, and } from "drizzle-orm";
+import { sql, gte, desc, eq, and, count } from "drizzle-orm";
 import { requireUser } from "@/lib/auth/session";
 import { ChangeTrendChart, type ChangeTrendPoint } from "./_components/change-trend-chart";
 
 export default async function Page() {
   const user = await requireUser({ redirectTo: "/dashboard" });
+  const db = resolveDb();
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-  const [siteRow] = await db
-    .select({ value: sql<number>`count(*)` })
+  const siteRows = await db
+    .select()
     .from(sites)
     .where(eq(sites.ownerId, user.id));
-  const [{ added = 0, removed = 0 } = {}] = await db
-    .select({
-      added: sql<number>`sum(case when ${changes.type} = 'added' then 1 else 0 end)`,
-      removed: sql<number>`sum(case when ${changes.type} = 'removed' then 1 else 0 end)`,
-    })
+  const siteRow = siteRows[0];
+  const changeRows = await db
+    .select()
     .from(changes)
     .innerJoin(sites, eq(changes.siteId, sites.id))
     .where(and(eq(sites.ownerId, user.id), gte(changes.occurredAt, since)));
+  
+  const added = changeRows.filter(row => row.changes.type === 'added').length;
+  const removed = changeRows.filter(row => row.changes.type === 'removed').length;
 
-  const [{ total = 0, failed = 0, duration = 0 } = {}] = await db
-    .select({
-      total: sql<number>`count(*)`,
-      failed: sql<number>`sum(case when ${scans.status} != 'success' then 1 else 0 end)`,
-      duration: sql<number>`avg(case when ${scans.finishedAt} is not null then (cast(${scans.finishedAt} as integer) - cast(${scans.startedAt} as integer)) else null end)`,
-    })
+  const scanRows = await db
+    .select()
     .from(scans)
     .innerJoin(sites, eq(scans.siteId, sites.id))
     .where(and(eq(sites.ownerId, user.id), gte(scans.startedAt, since)));
+  
+  const total = scanRows.length;
+  const failed = scanRows.filter(row => row.scans.status !== 'success').length;
+  const completedScans = scanRows.filter(row => row.scans.finishedAt && row.scans.startedAt);
+  const duration = completedScans.length > 0 
+    ? completedScans.reduce((sum, row) => {
+        const start = new Date(row.scans.startedAt!).getTime();
+        const end = new Date(row.scans.finishedAt!).getTime();
+        return sum + (end - start) / 1000; // convert to seconds
+      }, 0) / completedScans.length
+    : 0;
 
-  const topSites = await db
-    .select({
-      siteId: sites.id,
-      rootUrl: sites.rootUrl,
-      scanCount: sql<number>`count(${scans.id})`,
-    })
+  const topSiteRows = await db
+    .select()
     .from(sites)
     .leftJoin(
       scans,
       and(eq(scans.siteId, sites.id), gte(scans.startedAt, since)),
     )
-    .where(eq(sites.ownerId, user.id))
-    .groupBy(sites.id)
-    .orderBy(desc(sql`count(${scans.id})`))
-    .limit(5);
+    .where(eq(sites.ownerId, user.id));
+
+  // Group scans by siteId and count them
+  const siteScansMap = new Map<string, number>();
+  const siteDataMap = new Map<string, { siteId: string; rootUrl: string }>();
+  
+  for (const row of topSiteRows) {
+    const siteId = row.sites.id;
+    const rootUrl = row.sites.rootUrl;
+    
+    // Store site data
+    if (!siteDataMap.has(siteId)) {
+      siteDataMap.set(siteId, { siteId, rootUrl });
+    }
+    
+    // Count scans
+    if (row.scans?.id) {
+      siteScansMap.set(siteId, (siteScansMap.get(siteId) || 0) + 1);
+    } else if (!siteScansMap.has(siteId)) {
+      siteScansMap.set(siteId, 0);
+    }
+  }
+
+  const topSites = Array.from(siteDataMap.values())
+    .map(site => ({
+      ...site,
+      scanCount: siteScansMap.get(site.siteId) || 0,
+    }))
+    .sort((a, b) => b.scanCount - a.scanCount)
+    .slice(0, 5);
 
   const trendWindowStart = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-  const changeTrendRows = await db
-    .select({
-      day: sql<string>`strftime('%Y-%m-%d', ${changes.occurredAt}, 'unixepoch')`,
-      added: sql<number>`sum(case when ${changes.type} = 'added' then 1 else 0 end)`,
-      removed: sql<number>`sum(case when ${changes.type} = 'removed' then 1 else 0 end)`,
-      updated: sql<number>`sum(case when ${changes.type} = 'updated' then 1 else 0 end)`,
-    })
+  const trendChangeRows = await db
+    .select()
     .from(changes)
     .innerJoin(sites, eq(changes.siteId, sites.id))
-    .where(and(eq(sites.ownerId, user.id), gte(changes.occurredAt, trendWindowStart)))
-    .groupBy(sql`strftime('%Y-%m-%d', ${changes.occurredAt}, 'unixepoch')`)
-    .orderBy(sql`strftime('%Y-%m-%d', ${changes.occurredAt}, 'unixepoch')`);
+    .where(and(eq(sites.ownerId, user.id), gte(changes.occurredAt, trendWindowStart)));
 
-  const sitesCount = Number(siteRow?.value ?? 0);
+  // Group changes by day and count by type
+  const trendMap = new Map<string, { added: number; removed: number; updated: number }>();
+  
+  for (const row of trendChangeRows) {
+    const day = getDayKey(row.changes.occurredAt);
+    if (!day) continue;
+    
+    if (!trendMap.has(day)) {
+      trendMap.set(day, { added: 0, removed: 0, updated: 0 });
+    }
+    
+    const dayData = trendMap.get(day)!;
+    if (row.changes.type === 'added') dayData.added++;
+    else if (row.changes.type === 'removed') dayData.removed++;
+    else if (row.changes.type === 'updated') dayData.updated++;
+  }
+
+  const changeTrendRows = Array.from(trendMap.entries())
+    .map(([day, counts]) => ({ day, ...counts }))
+    .sort((a, b) => a.day.localeCompare(b.day));
+
+  const sitesCount = siteRows.length;
   const added24h = Number(added ?? 0);
   const removed24h = Number(removed ?? 0);
   const totalScans = Number(total ?? 0);
@@ -360,4 +405,21 @@ export default async function Page() {
       </div>
     </div>
   );
+}
+
+function getDayKey(value: unknown) {
+  const date = normalizeToDate(value);
+  return date ? date.toISOString().split('T')[0] : null;
+}
+
+function normalizeToDate(value: unknown) {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+
+  const numeric = typeof value === 'string' ? Number(value) : value;
+  if (typeof numeric !== 'number' || Number.isNaN(numeric)) return null;
+
+  // Values persisted via sqlite `unixepoch()` are seconds; record-level assignments use JS Date (ms)
+  const ms = numeric > 1e12 ? numeric : numeric * 1000;
+  return new Date(ms);
 }

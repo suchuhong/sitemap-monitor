@@ -2,7 +2,7 @@ import { randomUUID } from "crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
-import { db } from "@/lib/db";
+import { resolveDb } from "@/lib/db";
 import { users } from "@/lib/drizzle/schema";
 
 export const SESSION_COOKIE_NAME = "sm_session";
@@ -18,6 +18,7 @@ const COOKIE_OPTIONS = {
 type UserRecord = typeof users.$inferSelect;
 
 export async function createUserSession(email: string): Promise<UserRecord> {
+  const db = resolveDb();
   const normalizedEmail = email.trim().toLowerCase();
   if (!normalizedEmail) throw new Error("邮箱不能为空");
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(normalizedEmail)) {
@@ -37,6 +38,7 @@ export async function createUserSession(email: string): Promise<UserRecord> {
 }
 
 export async function getCurrentUser(): Promise<UserRecord | null> {
+  const db = resolveDb();
   const session = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
   if (!session) return null;
 
@@ -66,6 +68,7 @@ export async function clearSession() {
 }
 
 async function createUser(email: string): Promise<UserRecord> {
+  const db = resolveDb();
   const user = { id: randomUUID(), email, createdAt: new Date() };
   await db.insert(users).values(user);
   return user;

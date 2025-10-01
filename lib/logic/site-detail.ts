@@ -1,4 +1,4 @@
-import { db } from "@/lib/db";
+import { resolveDb } from "@/lib/db";
 import {
   sites,
   sitemaps,
@@ -23,6 +23,7 @@ export async function getSiteDetail({
   scansLimit = 5,
   changesLimit = 20,
 }: DetailOptions) {
+  const db = resolveDb();
   const siteRows = await db
     .select({
       id: sites.id,
@@ -166,6 +167,7 @@ function safeParseTags(value: string | null | undefined) {
 }
 
 async function fetchNotificationChannels(siteId: string) {
+  const db = resolveDb();
   const rows = await db
     .select({
       id: notificationChannels.id,
@@ -179,6 +181,7 @@ async function fetchNotificationChannels(siteId: string) {
 }
 
 async function fetchGroups(ownerId: string) {
+  const db = resolveDb();
   const rows = await db
     .select({
       id: siteGroups.id,
