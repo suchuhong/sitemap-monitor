@@ -13,13 +13,18 @@ export async function signInAction(
 ): Promise<SignInState> {
   const rawEmail = formData.get("email");
   const email = typeof rawEmail === "string" ? rawEmail : "";
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!normalizedEmail) return { error: "" };
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(normalizedEmail)) {
+    return { error: "请输入合法邮箱地址" };
+  }
   const redirectInput = formData.get("redirect");
   const redirectTarget = sanitizeRedirect(
     typeof redirectInput === "string" ? redirectInput : undefined,
   ) ?? "/dashboard";
 
   try {
-    await createUserSession(email);
+    await createUserSession(normalizedEmail);
   } catch (err) {
     const message = err instanceof Error ? err.message : "登录失败，请重试";
     return { error: message };
