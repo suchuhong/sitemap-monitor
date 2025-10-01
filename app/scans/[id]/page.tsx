@@ -6,6 +6,7 @@ import { eq, desc } from "drizzle-orm";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { formatDateTime } from "@/lib/datetime";
 
+export const runtime = 'edge';
 export const dynamic = "force-dynamic";
 
 export default async function ScanDetailPage({

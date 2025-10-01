@@ -6,6 +6,7 @@ import { resolveDb } from "@/lib/db";
 import { scans, sites, changes } from "@/lib/drizzle/schema";
 import { desc, eq } from "drizzle-orm";
 
+export const runtime = 'edge';
 export const dynamic = "force-dynamic";
 
 type ScanWithSite = {

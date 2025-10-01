@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Metadata } from "next";
 
+export const runtime = 'edge';
+
 export const metadata: Metadata = {
   title: "专业的网站地图监控与SEO优化平台 - Sitemap Monitor",
   description: "Sitemap Monitor是专业的网站地图监控平台，提供实时sitemap监控、SEO数据分析、网站结构优化建议。支持多站点管理，自动化监控，助力提升网站搜索引擎排名。免费试用，立即开始优化您的网站SEO。",

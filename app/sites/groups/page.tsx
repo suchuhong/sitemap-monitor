@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { createGroupAction, updateGroupAction } from "./actions";
 import { DeleteGroupButton } from "./delete-group-button";
 
+export const runtime = 'edge';
 export const dynamic = "force-dynamic";
 
 export default async function SiteGroupsPage({

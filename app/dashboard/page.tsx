@@ -7,6 +7,8 @@ import { gte, eq, and } from "drizzle-orm";
 import { requireUser } from "@/lib/auth/session";
 import { ChangeTrendChart, type ChangeTrendPoint } from "./_components/change-trend-chart";
 
+export const runtime = 'edge';
+
 export default async function Page() {
   const user = await requireUser({ redirectTo: "/dashboard" });
   const db = resolveDb();

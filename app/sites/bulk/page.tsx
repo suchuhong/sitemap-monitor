@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { performBulkAction } from "./actions";
 import { Input } from "@/components/ui/input";
 
+export const runtime = 'edge';
 export const dynamic = "force-dynamic";
 
 type SiteItem = {

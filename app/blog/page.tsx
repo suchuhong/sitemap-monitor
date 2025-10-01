@@ -3,6 +3,8 @@ import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import type { Metadata } from "next";
 
+export const runtime = 'edge';
+
 export const metadata: Metadata = {
   title: "SEO优化博客 - Sitemap Monitor专业见解",
   description: "Sitemap Monitor官方博客，分享网站地图监控、SEO优化技巧、搜索引擎优化最佳实践。专业的SEO知识分享，助力您的网站获得更好的搜索引擎排名。",

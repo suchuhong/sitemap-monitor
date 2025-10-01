@@ -13,6 +13,7 @@ import { GroupFilter } from "./_components/group-filter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
+export const runtime = 'edge';
 export const dynamic = "force-dynamic";
 
 function getParam(
