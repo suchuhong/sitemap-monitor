@@ -10,12 +10,24 @@ export type ScanPoint = {
 };
 
 export function ScanTrendChart({ points }: { points: ScanPoint[] }) {
-  const { path, area, maxY, labels } = useMemo(() => {
-    if (!points.length) return { path: "", area: "", maxY: 0, labels: [] as string[] };
+  const { pathTotal, pathAdded, pathRemoved, pathUpdated, area, maxY, labels } = useMemo(() => {
+    if (!points.length)
+      return {
+        pathTotal: "",
+        pathAdded: "",
+        pathRemoved: "",
+        pathUpdated: "",
+        area: "",
+        maxY: 0,
+        labels: [] as string[],
+      };
 
     const sorted = [...points].sort((a, b) => a.startedAt - b.startedAt);
     const totals = sorted.map((p) => Math.max(0, p.totalUrls));
-    const maxVal = Math.max(...totals, 1);
+    const addedValues = sorted.map((p) => Math.max(0, p.added));
+    const removedValues = sorted.map((p) => Math.max(0, p.removed));
+    const updatedValues = sorted.map((p) => Math.max(0, p.updated));
+    const maxVal = Math.max(...totals, ...addedValues, ...removedValues, ...updatedValues, 1);
 
     const width = 640;
     const height = 180;
@@ -27,13 +39,19 @@ export function ScanTrendChart({ points }: { points: ScanPoint[] }) {
       sorted.length === 1 ? padding + chartWidth / 2 : padding + (chartWidth * index) / (sorted.length - 1);
     const projectY = (value: number) => padding + chartHeight - (chartHeight * value) / maxVal;
 
-    const pathD = sorted
-      .map((point, idx) => `${idx === 0 ? "M" : "L"}${projectX(idx)},${projectY(point.totalUrls)}`)
-      .join(" ");
+    const buildPath = (values: number[]) =>
+      values
+        .map((value, idx) => `${idx === 0 ? "M" : "L"}${projectX(idx)},${projectY(value)}`)
+        .join(" ");
+
+    const pathTotal = buildPath(totals);
+    const pathAdded = buildPath(addedValues);
+    const pathRemoved = buildPath(removedValues);
+    const pathUpdated = buildPath(updatedValues);
 
     const areaD = sorted.length > 1
-      ? `${sorted
-          .map((point, idx) => `${idx === 0 ? "M" : "L"}${projectX(idx)},${projectY(point.totalUrls)}`)
+      ? `${totals
+          .map((value, idx) => `${idx === 0 ? "M" : "L"}${projectX(idx)},${projectY(value)}`)
           .join(" ")} L${projectX(sorted.length - 1)},${height - padding} L${projectX(0)},${height - padding} Z`
       : "";
 
@@ -47,7 +65,15 @@ export function ScanTrendChart({ points }: { points: ScanPoint[] }) {
       return `${month}月${day}日 ${hour}:${minute}`;
     });
 
-    return { path: pathD, area: areaD, maxY: maxVal, labels: labelList };
+    return {
+      pathTotal,
+      pathAdded,
+      pathRemoved,
+      pathUpdated,
+      area: areaD,
+      maxY: maxVal,
+      labels: labelList,
+    };
   }, [points]);
 
   if (!points.length) {
@@ -82,6 +108,18 @@ export function ScanTrendChart({ points }: { points: ScanPoint[] }) {
             <stop offset="0%" stopColor="#2563eb" />
             <stop offset="100%" stopColor="#0ea5e9" />
           </linearGradient>
+          <linearGradient id="addedStroke" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0%" stopColor="#16a34a" />
+            <stop offset="100%" stopColor="#22d3ee" />
+          </linearGradient>
+          <linearGradient id="removedStroke" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0%" stopColor="#dc2626" />
+            <stop offset="100%" stopColor="#fb7185" />
+          </linearGradient>
+          <linearGradient id="updatedStroke" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0%" stopColor="#f97316" />
+            <stop offset="100%" stopColor="#facc15" />
+          </linearGradient>
           <pattern id="gridPattern" width="32" height="32" patternUnits="userSpaceOnUse">
             <path d="M32 32H0V0" fill="none" stroke="rgba(148, 163, 184, 0.15)" strokeWidth="1" />
           </pattern>
@@ -89,9 +127,9 @@ export function ScanTrendChart({ points }: { points: ScanPoint[] }) {
         <g>
           <rect x="32" y="32" width="576" height="136" fill="url(#gridPattern)" />
           {area && <path d={area} fill="url(#scanArea)" />}
-          {path && (
+          {pathTotal && (
             <path
-              d={path}
+              d={pathTotal}
               fill="none"
               stroke="url(#scanStroke)"
               strokeWidth="3"
@@ -99,8 +137,45 @@ export function ScanTrendChart({ points }: { points: ScanPoint[] }) {
               strokeLinecap="round"
             />
           )}
+          {pathAdded && (
+            <path
+              d={pathAdded}
+              fill="none"
+              stroke="url(#addedStroke)"
+              strokeWidth="2"
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+          )}
+          {pathRemoved && (
+            <path
+              d={pathRemoved}
+              fill="none"
+              stroke="url(#removedStroke)"
+              strokeWidth="2"
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+          )}
+          {pathUpdated && (
+            <path
+              d={pathUpdated}
+              fill="none"
+              stroke="url(#updatedStroke)"
+              strokeWidth="2"
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+          )}
         </g>
       </svg>
+
+      <div className="flex flex-wrap gap-3 text-xs text-slate-500 dark:text-slate-400">
+        <LegendDot className="bg-gradient-to-r from-blue-600 to-sky-500" label="总数" />
+        <LegendDot className="bg-gradient-to-r from-emerald-600 to-cyan-300" label="新增" />
+        <LegendDot className="bg-gradient-to-r from-rose-600 to-rose-400" label="删除" />
+        <LegendDot className="bg-gradient-to-r from-orange-500 to-yellow-400" label="更新" />
+      </div>
 
       <div className="grid gap-2 text-xs text-slate-500 dark:text-slate-400 sm:grid-cols-2 md:grid-cols-3">
         {points.map((point, idx) => (
@@ -116,5 +191,14 @@ export function ScanTrendChart({ points }: { points: ScanPoint[] }) {
         ))}
       </div>
     </div>
+  );
+}
+
+function LegendDot({ label, className }: { label: string; className: string }) {
+  return (
+    <span className="inline-flex items-center gap-2">
+      <span className={`h-3 w-3 rounded-full ${className}`} aria-hidden />
+      <span>{label}</span>
+    </span>
   );
 }

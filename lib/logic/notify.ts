@@ -2,7 +2,7 @@ import crypto from "crypto";
 import nodemailer from "nodemailer";
 import type SMTPTransport from "nodemailer/lib/smtp-transport";
 import { db } from "@/lib/db";
-import { notificationChannels, webhooks } from "@/lib/drizzle/schema";
+import { notificationChannels, webhooks, sites } from "@/lib/drizzle/schema";
 import { eq } from "drizzle-orm";
 
 export type ChangePayload = {
@@ -17,6 +17,7 @@ export type ChangePayload = {
 type NotificationEnvelope = {
   type: string;
   siteId: string;
+  siteSlug?: string;
   scanId?: string;
   added?: number;
   removed?: number;
@@ -26,9 +27,18 @@ type NotificationEnvelope = {
 };
 
 export async function notifyChange(siteId: string, payload: ChangePayload) {
+  const siteInfo = await db
+    .select({ id: sites.id, rootUrl: sites.rootUrl })
+    .from(sites)
+    .where(eq(sites.id, siteId))
+    .limit(1);
+  const siteSummary = siteInfo[0];
+  const siteSlug = siteSummary?.rootUrl ?? siteId;
+
   const envelope: NotificationEnvelope = {
     type: "sitemap.change",
     siteId,
+    siteSlug,
     ...payload,
     ts: Math.floor(Date.now() / 1000),
   };
@@ -163,7 +173,7 @@ async function dispatchEmail(channel: ChannelRecord, envelope: NotificationEnvel
   }
 
   const summary = formatChangeSummary(envelope);
-  const subject = `[Sitemap Monitor] 站点 ${envelope.siteId} 有新的 sitemap 变更`;
+  const subject = `[Sitemap Monitor] 站点 ${envelope.siteSlug ?? envelope.siteId} 有新的 sitemap 变更`;
   const html = buildEmailHtml(envelope, summary);
   const text = buildEmailText(envelope, summary);
 
@@ -268,8 +278,9 @@ function formatChangeSummary(envelope: NotificationEnvelope) {
 }
 
 function buildEmailText(envelope: NotificationEnvelope, summary: string) {
+  const slug = envelope.siteSlug ?? envelope.siteId;
   return [
-    `站点 ${envelope.siteId} 触发 sitemap 变更通知。`,
+    `站点 ${slug} 触发 sitemap 变更通知。`,
     `扫描 ID: ${envelope.scanId ?? "未知"}`,
     `变更统计: ${summary}`,
     `时间: ${new Date(envelope.ts * 1000).toISOString()}`,
@@ -293,7 +304,7 @@ function buildEmailHtml(envelope: NotificationEnvelope, summary: string) {
 
 function buildSlackPayload(envelope: NotificationEnvelope) {
   const summary = formatChangeSummary(envelope);
-  const text = `站点 *${envelope.siteId}* 有新的 sitemap 变更：${summary}`;
+  const text = `站点 *${envelope.siteSlug ?? envelope.siteId}* 有新的 sitemap 变更：${summary}`;
   return {
     text,
     blocks: [

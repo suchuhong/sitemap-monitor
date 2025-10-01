@@ -261,6 +261,6 @@ Sitemap Monitor 是一个基于 Next.js 15 的示例项目，用于接入站点�
 - 如果需要运行 ESLint，Next.js 15 会提示迁移脚本，可按向导执行或手动改为直接使用 `eslint` CLI。
 - 未来功能拓展建议可参考 `docs/roadmap.md`，按阶段规划后续迭代。
 - 阶段 1 新增能力（登录、队列、批量导入反馈等）的使用说明见 `docs/stage-one-guide.md`。
-- 阶段 2 “监控能力增强”（差异报告、多渠道告警、智能调度）使用指南见 `docs/stage-two-guide.md`。
+- 阶段 2 “监控能力增强”（差异报告、多渠道告警、外部调度建议）使用指南见 `docs/stage-two-guide.md`。
 - 阶段 3 “分析与运营工具”（趋势分析、分组管理、变更归因）使用指南见 `docs/stage-three-guide.md`。
 - 可观测性与日志采集说明见 `docs/observability.md`。

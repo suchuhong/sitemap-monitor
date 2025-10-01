@@ -49,6 +49,7 @@ export function SiteActionsPanel({
   const [tags, setTags] = useState(initialNormalized);
   const [scanPriority, setScanPriority] = useState(initialPriority);
   const [scanInterval, setScanInterval] = useState(initialInterval);
+  const [scanIntervalInput, setScanIntervalInput] = useState(String(initialInterval));
   const [groupId, setGroupId] = useState(initialGroupId);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -134,6 +135,7 @@ export function SiteActionsPanel({
       if (typeof detail?.site?.scanIntervalMinutes === "number") {
         setScanInterval(detail.site.scanIntervalMinutes);
         setBaselineInterval(detail.site.scanIntervalMinutes);
+        setScanIntervalInput(String(detail.site.scanIntervalMinutes));
       }
       if (detail?.site?.groupId !== undefined) {
         const value = detail.site.groupId ?? "";
@@ -210,10 +212,29 @@ export function SiteActionsPanel({
               <Input
                 type="number"
                 min={5}
-                value={scanInterval}
-                onChange={(event) =>
-                  setScanInterval(clamp(parseInt(event.target.value, 10), 5, 10080))
-                }
+                value={scanIntervalInput}
+                inputMode="numeric"
+                pattern="[0-9]*"
+                onChange={(event) => {
+                  const { value } = event.target;
+                  if (!/^[0-9]*$/.test(value)) return;
+                  setScanIntervalInput(value);
+                  if (value === "") return;
+                  const parsed = parseInt(value, 10);
+                  if (!Number.isNaN(parsed)) {
+                    setScanInterval(clamp(parsed, 5, 10080));
+                  }
+                }}
+                onBlur={() => {
+                  if (scanIntervalInput === "") {
+                    setScanIntervalInput(String(scanInterval));
+                    return;
+                  }
+                  const parsed = parseInt(scanIntervalInput, 10);
+                  const clamped = clamp(parsed, 5, 10080);
+                  setScanInterval(clamped);
+                  setScanIntervalInput(String(clamped));
+                }}
               />
               <p className="text-xs text-slate-400">推荐 15 ~ 1440 分钟，可按站点重要性调整。</p>
             </div>
@@ -225,14 +246,15 @@ export function SiteActionsPanel({
             <Button
               type="button"
               variant="outline"
-              onClick={() => {
-                setRootUrl(baselineRoot);
-                setEnabled(baselineEnabled);
-                setTags(baselineTags);
-                setScanPriority(baselinePriority);
-                setScanInterval(baselineInterval);
-                setGroupId(baselineGroupId);
-              }}
+            onClick={() => {
+              setRootUrl(baselineRoot);
+              setEnabled(baselineEnabled);
+              setTags(baselineTags);
+              setScanPriority(baselinePriority);
+              setScanInterval(baselineInterval);
+              setScanIntervalInput(String(baselineInterval));
+              setGroupId(baselineGroupId);
+            }}
               disabled={saving || (!dirty && !saving)}
             >
               重置

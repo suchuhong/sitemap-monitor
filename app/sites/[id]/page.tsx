@@ -141,24 +141,19 @@ export default async function SiteDetailPage({
             <CardTitle>URL 概览</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-3 gap-3 text-center">
-              <div>
-                <div className="text-lg font-semibold">{summary.totalUrls}</div>
-                <div className="text-xs text-slate-500">总数</div>
-              </div>
-              <div>
-                <div className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">
-                  {summary.activeUrls}
-                </div>
-                <div className="text-xs text-slate-500">活跃</div>
-              </div>
-              <div>
-                <div className="text-lg font-semibold text-amber-600 dark:text-amber-400">
-                  {summary.inactiveUrls}
-                </div>
-                <div className="text-xs text-slate-500">已失效</div>
-              </div>
+            <div className="grid gap-3 text-center sm:grid-cols-3">
+              <MetricBlock label="总数" value={summary.totalUrls} />
+              <MetricBlock label="活跃" value={summary.activeUrls} emphasis="positive" />
+              <MetricBlock label="已失效" value={summary.inactiveUrls} emphasis="warning" />
             </div>
+            <div className="mt-4 grid gap-3 text-center sm:grid-cols-3">
+              <MetricBlock label="最近新增" value={summary.activity.added} emphasis="positive" prefix="+" />
+              <MetricBlock label="最近删除" value={summary.activity.removed} emphasis="negative" prefix="-" />
+              <MetricBlock label="最近更新" value={summary.activity.updated} emphasis="info" prefix="~" />
+            </div>
+            <p className="mt-3 text-xs text-slate-400">
+              统计基于最近一次扫描（共 {summary.activity.total} 个 URL），可在下方“最近扫描”中查看详情。
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -276,4 +271,40 @@ function statusBadgeVariant(status: string): BadgeProps["variant"] {
   if (status === "success") return "added";
   if (status === "failed") return "removed";
   return "default";
+}
+
+function MetricBlock({
+  label,
+  value,
+  emphasis = "default",
+  prefix,
+}: {
+  label: string;
+  value: number;
+  emphasis?: "default" | "positive" | "negative" | "warning" | "info";
+  prefix?: string;
+}) {
+  const display = Number.isFinite(value) ? value : 0;
+  const tone = metricTone(emphasis);
+  return (
+    <div>
+      <div className={`text-lg font-semibold ${tone}`}>{`${prefix ?? ""}${display}`}</div>
+      <div className="text-xs text-slate-500">{label}</div>
+    </div>
+  );
+}
+
+function metricTone(emphasis: "default" | "positive" | "negative" | "warning" | "info") {
+  switch (emphasis) {
+    case "positive":
+      return "text-emerald-600 dark:text-emerald-400";
+    case "negative":
+      return "text-rose-600 dark:text-rose-400";
+    case "warning":
+      return "text-amber-600 dark:text-amber-400";
+    case "info":
+      return "text-sky-600 dark:text-sky-400";
+    default:
+      return "";
+  }
 }

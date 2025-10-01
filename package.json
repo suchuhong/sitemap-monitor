@@ -4,10 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "dev:scheduler": "node scripts/start-with-scheduler.js",
     "build": "next build",
     "start": "next start",
-    "start:scheduler": "NODE_ENV=production node scripts/start-with-scheduler.js",
     "lint": "eslint .",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",

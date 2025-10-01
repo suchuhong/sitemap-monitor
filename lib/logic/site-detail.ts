@@ -130,13 +130,24 @@ export async function getSiteDetail({
     { totalUrls: 0, activeUrls: 0, inactiveUrls: 0 },
   );
 
+  const latestScan = recentScans[0];
+  const activity = {
+    added: Number(latestScan?.added ?? 0),
+    removed: Number(latestScan?.removed ?? 0),
+    updated: Number(latestScan?.updated ?? 0),
+    total: Number(latestScan?.totalUrls ?? summary.totalUrls ?? 0),
+  };
+
   return {
     site: {
       ...site,
       tags: safeParseTags(site.tags),
     },
     sitemaps: sitemapsWithCounts,
-    summary,
+    summary: {
+      ...summary,
+      activity,
+    },
     recentScans,
     recentChanges,
     notifications: await fetchNotificationChannels(site.id),
