@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { performBulkAction } from "./actions";
-import { getCfBindingEnvSafely } from "@/lib/cf";
+
 
 export const dynamic = "force-dynamic";
 
@@ -63,7 +63,7 @@ export default async function BulkSitesPage({
 }
 
 async function fetchSites(ownerId: string) {
-  const db = resolveDb({ bindingEnv: getCfBindingEnvSafely() }) as any;
+  const db = resolveDb() as any;
   return await db
     .select({
       id: sites.id,
@@ -79,7 +79,7 @@ async function fetchSites(ownerId: string) {
 }
 
 async function fetchGroups(ownerId: string) {
-  const db = resolveDb({ bindingEnv: getCfBindingEnvSafely() }) as any;
+  const db = resolveDb() as any;
   return await db
     .select({ id: siteGroups.id, name: siteGroups.name })
     .from(siteGroups)

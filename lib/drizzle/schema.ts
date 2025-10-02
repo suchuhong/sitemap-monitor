@@ -141,15 +141,4 @@ export const notificationChannels = sqliteTable("notification_channels", {
   ),
 });
 
-export const observabilityLogs = sqliteTable("observability_logs", {
-  id: text("id").primaryKey(),
-  type: text("type").notNull(),
-  scope: text("scope").notNull(),
-  level: text("level").default("info"),
-  message: text("message"),
-  requestId: text("request_id"),
-  payload: text("payload"),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(
-    sql`(unixepoch())`,
-  ),
-});
+

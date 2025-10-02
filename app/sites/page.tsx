@@ -12,7 +12,7 @@ import { TagFilter } from "./_components/tag-filter";
 import { GroupFilter } from "./_components/group-filter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getCfBindingEnvSafely } from "@/lib/cf";
+
 
 export const dynamic = "force-dynamic";
 
@@ -64,7 +64,7 @@ export default async function SitesPage({
   }
   const redirectTo = `/sites${redirectParams.toString() ? `?${redirectParams.toString()}` : ""}`;
   const user = await requireUser({ redirectTo });
-  const db = resolveDb({ bindingEnv: getCfBindingEnvSafely() }) as any;
+  const db = resolveDb() as any;
 
   const tagParam = getParam(params, "tags", "");
   const selectedTags = tagParam
@@ -265,7 +265,7 @@ export default async function SitesPage({
 }
 
 async function fetchDistinctTags(ownerId: string) {
-  const db = resolveDb({ bindingEnv: getCfBindingEnvSafely() }) as any;
+  const db = resolveDb() as any;
   const rows = await db
     .select({ tags: sites.tags })
     .from(sites)
@@ -294,7 +294,7 @@ function buildTagsWhereClause(tags: string[]) {
 }
 
 async function fetchGroups(ownerId: string) {
-  const db = resolveDb({ bindingEnv: getCfBindingEnvSafely() }) as any;
+  const db = resolveDb() as any;
   const rows = await db
     .select({ id: siteGroups.id, name: siteGroups.name, color: siteGroups.color })
     .from(siteGroups)

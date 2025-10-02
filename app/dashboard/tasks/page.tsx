@@ -4,7 +4,7 @@ import { formatDateTime } from "@/lib/datetime";
 import { requireUser } from "@/lib/auth/session";
 import { resolveDb } from "@/lib/db";
 import { scans, sites, changes } from "@/lib/drizzle/schema";
-import { getCfBindingEnvSafely } from "@/lib/cf";
+
 import { desc, eq } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
@@ -36,7 +36,7 @@ type ChangeRecord = {
 
 export default async function TasksPage() {
   const user = await requireUser({ redirectTo: "/dashboard/tasks" });
-  const db = resolveDb({ bindingEnv: getCfBindingEnvSafely() }) as any;
+  const db = resolveDb() as any;
 
   const [rawScanRows, rawChangeRows] = await Promise.all([
     db

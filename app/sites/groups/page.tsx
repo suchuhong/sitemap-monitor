@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { createGroupAction, updateGroupAction } from "./actions";
 import { DeleteGroupButton } from "./delete-group-button";
-import { getCfBindingEnvSafely } from "@/lib/cf";
+
 
 export const dynamic = "force-dynamic";
 
@@ -125,7 +125,7 @@ export default async function SiteGroupsPage({
 }
 
 async function fetchGroupsWithCounts(ownerId: string) {
-  const db = resolveDb({ bindingEnv: getCfBindingEnvSafely() }) as any;
+  const db = resolveDb() as any;
   return await db
     .select({
       id: siteGroups.id,
@@ -144,7 +144,7 @@ async function fetchGroupsWithCounts(ownerId: string) {
 }
 
 async function countSites(ownerId: string) {
-  const db = resolveDb({ bindingEnv: getCfBindingEnvSafely() }) as any;
+  const db = resolveDb() as any;
   const [row] = await db
     .select({ count: sql<number>`count(*)` })
     .from(sites)

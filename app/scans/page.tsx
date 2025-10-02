@@ -2,7 +2,7 @@ import { ScansTable, type ScanRecord } from "./_components/scans-table";
 import { ScansFilters } from "./_components/scans-filters";
 import type { Metadata } from "next";
 import { resolveDb } from "@/lib/db";
-import { getCfBindingEnvSafely } from "@/lib/cf";
+
 import { scans, sites } from "@/lib/drizzle/schema";
 import { desc, asc, like, eq, and, count } from "drizzle-orm";
 import { requireUser } from "@/lib/auth/session";
@@ -24,7 +24,7 @@ async function getScansData(params: {
     userId: string;
 }) {
     const { page, pageSize, sort, sortDirection, status, site, userId } = params;
-    const db = resolveDb({ bindingEnv: getCfBindingEnvSafely() }) as any;
+    const db = resolveDb() as any;
     
     // 构建查询条件
     const conditions = [eq(sites.ownerId, userId)];
@@ -85,7 +85,7 @@ async function getScansData(params: {
         .offset((page - 1) * pageSize);
 
     // 转换为 ScanRecord 格式
-    const scanRecords: ScanRecord[] = results.map(row => {
+    const scanRecords: ScanRecord[] = results.map((row: { startedAt: string | number | Date; finishedAt: string | number | Date; status: any; error: any; id: any; siteId: any; siteName: any; totalUrls: any; added: any; removed: any; updated: any; priority: any; }) => {
         const startedAt = row.startedAt ? new Date(row.startedAt) : new Date();
         const finishedAt = row.finishedAt ? new Date(row.finishedAt) : null;
         
@@ -183,7 +183,7 @@ export default async function ScansPage({
     });
 
     // 获取统计数据（用于卡片显示）
-    const db = resolveDb({ bindingEnv: getCfBindingEnvSafely() }) as any;
+    const db = resolveDb() as any;
     const statsResult = await db
         .select({
             status: scans.status,
@@ -201,7 +201,7 @@ export default async function ScansPage({
         pending: 0,
     };
 
-    statsResult.forEach(row => {
+    statsResult.forEach((row: { status: string | string[]; count: number; }) => {
         switch (row.status) {
             case "success":
                 stats.success = row.count;

@@ -119,7 +119,7 @@ function verifySignature(rawBody: string, signature: string, secret: string) {
 ## 7. 本地测试技巧
 
 - 将 `target` 指向 `https://webhook.site/<uuid>`，即可在浏览器中实时查看请求与签名。
-- 使用 `ngrok` 或 `cloudflared` 暴露本地服务，结合日志验证签名。
+- 使用 `ngrok` 暴露本地服务，结合日志验证签名。
 - 如果需要自定义重试策略，可在接收端返回非 2xx 状态，观察客户端日志。
 
 ## 8. 生产建议

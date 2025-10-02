@@ -18,7 +18,6 @@ async function createHmacSignature(secret: string, data: string): Promise<string
 // To enable email notifications, deploy email-specific API routes with Node.js runtime
 const EMAIL_DISABLED_IN_EDGE_RUNTIME = true;
 import { resolveDb } from "@/lib/db";
-import { getCfBindingEnvSafely } from "@/lib/cf";
 import { notificationChannels, webhooks, sites } from "@/lib/drizzle/schema";
 import { eq } from "drizzle-orm";
 
@@ -44,7 +43,7 @@ type NotificationEnvelope = {
 };
 
 export async function notifyChange(siteId: string, payload: ChangePayload) {
-  const db = resolveDb({ bindingEnv: getCfBindingEnvSafely() }) as any;
+  const db = resolveDb() as any;
   const siteInfo = await db
     .select({ id: sites.id, rootUrl: sites.rootUrl })
     .from(sites)
@@ -87,7 +86,7 @@ type ChannelRecord = {
 };
 
 async function loadChannels(siteId: string): Promise<ChannelRecord[]> {
-  const db = resolveDb({ bindingEnv: getCfBindingEnvSafely() }) as any;
+  const db = resolveDb() as any;
   const custom = await db
     .select({
       id: notificationChannels.id,

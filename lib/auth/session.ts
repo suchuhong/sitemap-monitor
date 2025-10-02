@@ -2,7 +2,6 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { resolveDb } from "@/lib/db";
-import { getCfBindingEnvSafely } from "@/lib/cf";
 import { users } from "@/lib/drizzle/schema";
 import { generateId } from "@/lib/utils/id";
 
@@ -19,7 +18,7 @@ const COOKIE_OPTIONS = {
 type UserRecord = typeof users.$inferSelect;
 
 export async function createUserSession(email: string): Promise<UserRecord> {
-  const db = resolveDb({ bindingEnv: getCfBindingEnvSafely() }) as any;
+  const db = resolveDb() as any;
   const normalizedEmail = email.trim().toLowerCase();
   if (!normalizedEmail) throw new Error("邮箱不能为空");
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(normalizedEmail)) {
@@ -42,7 +41,7 @@ export async function getCurrentUser(): Promise<UserRecord | null> {
   const session = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
   if (!session) return null;
 
-  const db = resolveDb({ bindingEnv: getCfBindingEnvSafely() }) as any;
+  const db = resolveDb() as any;
   const [user] = await db
     .select({ id: users.id, email: users.email, createdAt: users.createdAt })
     .from(users)
@@ -69,7 +68,7 @@ export async function clearSession() {
 }
 
 async function createUser(email: string): Promise<UserRecord> {
-  const db = resolveDb({ bindingEnv: getCfBindingEnvSafely() }) as any;
+  const db = resolveDb() as any;
   const user = { id: generateId(), email, createdAt: new Date() };
   await db.insert(users).values(user);
   return user;

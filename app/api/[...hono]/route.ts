@@ -6,7 +6,6 @@ import { discover, rediscoverSite } from "@/lib/logic/discover";
 import { enqueueScan, cronScan } from "@/lib/logic/scan";
 import { getSiteDetail } from "@/lib/logic/site-detail";
 import { resolveDb, type DatabaseClient } from "@/lib/db";
-import { getCfBindingEnvSafely } from "@/lib/cf";
 import {
   users,
   sites,
@@ -21,14 +20,10 @@ import {
 import { desc, and, eq, gte, lte } from "drizzle-orm";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/session";
 import type { SQL } from "drizzle-orm";
-import type { D1Database } from "@cloudflare/workers-types";
-
 
 const randomUUID = () => crypto.randomUUID();
 
-
 const app = new Hono<{
-  Bindings: { DB: D1Database };
   Variables: { userId: string; userEmail?: string; requestId: string; db: DatabaseClient };
 }>().basePath("/api");
 
@@ -55,8 +50,7 @@ app.use("*", async (c, next) => {
   const sessionId = getCookie(c, SESSION_COOKIE_NAME);
   if (!sessionId) return c.json({ error: "unauthorized" }, 401);
 
-  const bindingEnv = getCfBindingEnvSafely() ?? (c.env ? { DB: (c.env as any).DB as D1Database } : undefined);
-  const db = resolveDb({ bindingEnv }) as any;
+  const db = resolveDb() as any;
   const userRows = await (db as any)
     .select()
     .from(users)
@@ -70,9 +64,8 @@ app.use("*", async (c, next) => {
   c.set("userEmail", user.email);
   c.set("db", db);
   await next();
-});
-
-app.post("/sites", async (c) => {
+});app.
+post("/sites", async (c) => {
   const schema = z.object({
     rootUrl: z.string().url(),
     tags: z.array(z.string()).optional(),
@@ -89,8 +82,7 @@ app.post("/sites", async (c) => {
 
 app.get("/sites", async (c) => {
   const ownerId = c.get("userId");
-  const bindingEnv = getCfBindingEnvSafely() ?? (c.env ? { DB: (c.env as any).DB as D1Database } : undefined);
-  const db = c.get("db") ?? (resolveDb({ bindingEnv }) as any);
+  const db = c.get("db") ?? (resolveDb() as any);
   const rawRows = await (db as any)
     .select()
     .from(sites)
@@ -118,8 +110,7 @@ app.get("/sites", async (c) => {
 app.patch("/sites/:id", async (c) => {
   const id = c.req.param("id");
   const ownerId = c.get("userId");
-  const bindingEnv = getCfBindingEnvSafely() ?? (c.env ? { DB: (c.env as any).DB as D1Database } : undefined);
-  const db = c.get("db") ?? (resolveDb({ bindingEnv }) as any);
+  const db = c.get("db") ?? (resolveDb() as any);
   const schema = z
     .object({
       rootUrl: z.string().url().optional(),
@@ -135,7 +126,7 @@ app.patch("/sites/:id", async (c) => {
   const body = schema.parse(await c.req.json());
   const normalizedTags = normalizeTagsList(body.tags);
 
-  const existingRows =   await (db as any)
+  const existingRows = await (db as any)
     .select()
     .from(sites)
     .where(eq(sites.id, id))
@@ -195,8 +186,7 @@ app.patch("/sites/:id", async (c) => {
 app.delete("/sites/:id", async (c) => {
   const id = c.req.param("id");
   const ownerId = c.get("userId") as string;
-  const bindingEnv = getCfBindingEnvSafely() ?? (c.env ? { DB: (c.env as any).DB as D1Database } : undefined);
-  const db = c.get("db") ?? (resolveDb({ bindingEnv }) as any);
+  const db = c.get("db") ?? (resolveDb() as any);
   const existingRows = await (db as any)
     .select()
     .from(sites)
@@ -237,8 +227,7 @@ function normalizeTagsList(tags?: string[]) {
 
 app.get("/sites/export.csv", async (c) => {
   const ownerId = c.get("userId");
-  const bindingEnv = getCfBindingEnvSafely() ?? (c.env ? { DB: (c.env as any).DB as D1Database } : undefined);
-  const db = c.get("db") ?? (resolveDb({ bindingEnv }) as any);
+  const db = c.get("db") ?? (resolveDb() as any);
   const rawRows = await (db as any)
     .select()
     .from(sites)
@@ -253,7 +242,7 @@ app.get("/sites/export.csv", async (c) => {
   }));
   const csv = ["id,rootUrl,robotsUrl,createdAt"]
     .concat(
-      rows        .map((r: any) =>
+      rows.map((r: any) =>
           [r.id, r.rootUrl, r.robotsUrl ?? "", r.createdAt ?? ""]
             .map((v: any) => `"${String(v).replaceAll('"', '""')}"`)
             .join(","),
@@ -279,8 +268,7 @@ app.get("/sites/:id", async (c) => {
 app.post("/sites/:id/scan", async (c) => {
   const id = c.req.param("id");
   const ownerId = c.get("userId");
-  const bindingEnv = getCfBindingEnvSafely() ?? (c.env ? { DB: (c.env as any).DB as D1Database } : undefined);
-  const db = c.get("db") ?? (resolveDb({ bindingEnv }) as any);
+  const db = c.get("db") ?? (resolveDb() as any);
   const siteRows = await (db as any)
     .select()
     .from(sites)
@@ -290,16 +278,8 @@ app.post("/sites/:id/scan", async (c) => {
   if (!site) return c.json({ error: "not found" }, 404);
   const { scanId } = await enqueueScan(id);
   return c.json({ ok: true, status: "queued", scanId });
-});
-
-
-
-export const GET = handle(app);
-export const POST = handle(app);
-export const PATCH = handle(app);
-export const DELETE = handle(app);
-
-app.post("/sites/:id/webhooks", async (c) => {
+});app
+.post("/sites/:id/webhooks", async (c) => {
   type WebhookBody = { targetUrl?: unknown; secret?: unknown };
 
   // Accept form or JSON
@@ -317,8 +297,8 @@ app.post("/sites/:id/webhooks", async (c) => {
   if (!targetUrl) return c.json({ error: "targetUrl required" }, 400);
   const siteId = c.req.param("id");
   const ownerId = c.get("userId");
-  const db = c.get("db") ?? resolveDb({ bindingEnv: c.env, runtimeHint: "edge" }) as any;
-  const siteRows =   await (db as any)
+  const db = c.get("db") ?? resolveDb() as any;
+  const siteRows = await (db as any)
     .select()
     .from(sites)
     .where(and(eq(sites.id, siteId), eq(sites.ownerId, ownerId)))
@@ -335,8 +315,7 @@ app.post("/sites/:id/test-webhook", async (c) => {
   const { notifyChange } = await import("@/lib/logic/notify");
   const siteId = c.req.param("id");
   const ownerId = c.get("userId");
-  const bindingEnv = getCfBindingEnvSafely() ?? (c.env ? { DB: (c.env as any).DB as D1Database } : undefined);
-  const db = c.get("db") ?? (resolveDb({ bindingEnv }) as any);
+  const db = c.get("db") ?? (resolveDb() as any);
   const siteRows = await (db as any)
     .select()
     .from(sites)
@@ -357,8 +336,7 @@ app.post("/sites/:id/test-webhook", async (c) => {
 app.get("/sites/:id/notifications", async (c) => {
   const siteId = c.req.param("id");
   const ownerId = c.get("userId");
-  const bindingEnv = getCfBindingEnvSafely() ?? (c.env ? { DB: (c.env as any).DB as D1Database } : undefined);
-  const db = c.get("db") ?? (resolveDb({ bindingEnv }) as any);
+  const db = c.get("db") ?? (resolveDb() as any);
 
   const siteRows = await (db as any)
     .select()
@@ -368,7 +346,7 @@ app.get("/sites/:id/notifications", async (c) => {
   const site = siteRows[0];
   if (!site) return c.json({ error: "not found" }, 404);
 
-  const channelRows =   await (db as any)
+  const channelRows = await (db as any)
     .select()
     .from(notificationChannels)
     .where(eq(notificationChannels.siteId, siteId));
@@ -387,8 +365,7 @@ app.get("/sites/:id/notifications", async (c) => {
 app.post("/sites/:id/notifications", async (c) => {
   const siteId = c.req.param("id");
   const ownerId = c.get("userId");
-  const bindingEnv = getCfBindingEnvSafely() ?? (c.env ? { DB: (c.env as any).DB as D1Database } : undefined);
-  const db = c.get("db") ?? (resolveDb({ bindingEnv }) as any);
+  const db = c.get("db") ?? (resolveDb() as any);
 
   const siteRows = await (db as any)
     .select()
@@ -424,9 +401,9 @@ app.delete("/sites/:id/notifications/:notificationId", async (c) => {
   const siteId = c.req.param("id");
   const notificationId = c.req.param("notificationId");
   const ownerId = c.get("userId");
-  const db = c.get("db") ?? resolveDb({ bindingEnv: c.env, runtimeHint: "edge" }) as any;
+  const db = c.get("db") ?? resolveDb() as any;
 
-  const siteRows =   await (db as any)
+  const siteRows = await (db as any)
     .select()
     .from(sites)
     .where(and(eq(sites.id, siteId), eq(sites.ownerId, ownerId)))
@@ -444,8 +421,8 @@ app.delete("/sites/:id/notifications/:notificationId", async (c) => {
 app.get("/sites/:id/changes.csv", async (c) => {
   const id = c.req.param("id");
   const ownerId = c.get("userId");
-  const db = c.get("db") ?? resolveDb({ bindingEnv: c.env, runtimeHint: "edge" }) as any;
-  const siteRows =   await (db as any)
+  const db = c.get("db") ?? resolveDb() as any;
+  const siteRows = await (db as any)
     .select()
     .from(sites)
     .where(and(eq(sites.id, id), eq(sites.ownerId, ownerId)))
@@ -478,7 +455,7 @@ app.get("/sites/:id/changes.csv", async (c) => {
   let whereClause: SQL | undefined = firstFilter;
   for (const condition of restFilters) whereClause = and(whereClause!, condition);
 
-  const rawList =   await (db as any)
+  const rawList = await (db as any)
     .select()
     .from(changes)
     .where(whereClause)
@@ -521,7 +498,7 @@ app.get("/sites/:id/scan-diff", async (c) => {
   const scanId = url.searchParams.get("scanId");
   if (!scanId) return c.json({ error: "scanId required" }, 400);
 
-  const db = c.get("db") ?? resolveDb({ bindingEnv: c.env, runtimeHint: "edge" }) as any;
+  const db = c.get("db") ?? resolveDb() as any;
   const scanRows = await (db as any)
     .select()
     .from(scans)
@@ -534,7 +511,7 @@ app.get("/sites/:id/scan-diff", async (c) => {
   } : undefined;
   if (!scanRow || scanRow.siteId !== siteId) return c.json({ error: "not found" }, 404);
 
-  const siteRows =   await (db as any)
+  const siteRows = await (db as any)
     .select()
     .from(sites)
     .where(eq(sites.id, siteId))
@@ -542,7 +519,7 @@ app.get("/sites/:id/scan-diff", async (c) => {
   const site = siteRows[0];
   if (!site || site.ownerId !== ownerId) return c.json({ error: "not found" }, 404);
 
-  const rowData =   await (db as any)
+  const rowData = await (db as any)
     .select()
     .from(changes)
     .where(and(eq(changes.siteId, siteId), eq(changes.scanId, scanId)))
@@ -620,3 +597,8 @@ app.post("/sites/import", async (c) => {
   }
   return c.json({ ok: true, imported: successCount, results });
 });
+
+export const GET = handle(app);
+export const POST = handle(app);
+export const PATCH = handle(app);
+export const DELETE = handle(app);

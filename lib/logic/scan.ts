@@ -1,6 +1,5 @@
 import { XMLParser } from "fast-xml-parser";
 import { resolveDb } from "@/lib/db";
-import { getCfBindingEnvSafely } from "@/lib/cf";
 import { sitemaps, urls, scans, changes, sites } from "@/lib/drizzle/schema";
 import { eq } from "drizzle-orm";
 import { fetchWithCompression, retry } from "./net";
@@ -21,7 +20,7 @@ const scanQueue: ScanJob[] = [];
 let processing = false;
 
 export async function cronScan() {
-  const db = resolveDb({ bindingEnv: getCfBindingEnvSafely() }) as any;
+  const db = resolveDb() as any;
   const now = Date.now();
   const activeSites = await db
     .select({
@@ -69,7 +68,7 @@ export async function cronScan() {
 }
 
 export async function runScanNow(siteId: string) {
-  const db = resolveDb({ bindingEnv: getCfBindingEnvSafely() }) as any;
+  const db = resolveDb() as any;
   const scanId = generateId();
   await db
     .insert(scans)
@@ -78,7 +77,7 @@ export async function runScanNow(siteId: string) {
 }
 
 export async function enqueueScan(siteId: string) {
-  const db = resolveDb({ bindingEnv: getCfBindingEnvSafely() }) as any;
+  const db = resolveDb() as any;
   const scanId = generateId();
   await db
     .insert(scans)
@@ -104,7 +103,7 @@ async function processQueue() {
 }
 
 async function executeScan({ scanId, siteId }: ScanJob) {
-  const db = resolveDb({ bindingEnv: getCfBindingEnvSafely() }) as any;
+  const db = resolveDb() as any;
   const startTime = new Date();
   await db
     .update(scans)

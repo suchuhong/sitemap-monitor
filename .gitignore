@@ -117,7 +117,7 @@ Thumbs.db
 
 # Vercel
 .vercel
-.wrangler/
+
 
 # Turbo
 .turbo
@@ -262,8 +262,5 @@ tramp
 
 # End of https://www.toptal.com/developers/gitignore/api/node,nextjs,react,typescript
 # OpenNext.js build output
-.open-next/
 
-# Cloudflare Workers
-.wrangler/
-wrangler.toml.bak
+

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { resolveDb } from "@/lib/db";
-import { getCfBindingEnvSafely } from "@/lib/cf";
+
 import { scans, sites, changes, sitemaps } from "@/lib/drizzle/schema";
 import { eq, desc } from "drizzle-orm";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -16,7 +16,7 @@ export default async function ScanDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const db = resolveDb({ bindingEnv: getCfBindingEnvSafely() }) as any;
+  const db = resolveDb() as any;
 
   const [scan] = await db
     .select()

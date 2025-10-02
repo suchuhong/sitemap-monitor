@@ -6,13 +6,13 @@ import { sites, changes, scans } from "@/lib/drizzle/schema";
 import { gte, eq, and } from "drizzle-orm";
 import { requireUser } from "@/lib/auth/session";
 import { ChangeTrendChart, type ChangeTrendPoint } from "./_components/change-trend-chart";
-import { getCfBindingEnvSafely } from "@/lib/cf";
+
 
 
 
 export default async function Page() {
   const user = await requireUser({ redirectTo: "/dashboard" });
-  const db = resolveDb({ bindingEnv: getCfBindingEnvSafely() }) as any;
+  const db = resolveDb() as any;
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
   const siteRows = await db
@@ -25,8 +25,8 @@ export default async function Page() {
     .innerJoin(sites, eq(changes.siteId, sites.id))
     .where(and(eq(sites.ownerId, user.id), gte(changes.occurredAt, since)));
   
-  const added = changeRows.filter(row => row.changes.type === 'added').length;
-  const removed = changeRows.filter(row => row.changes.type === 'removed').length;
+  const added = changeRows.filter((row: { changes: { type: string; }; }) => row.changes.type === 'added').length;
+  const removed = changeRows.filter((row: { changes: { type: string; }; }) => row.changes.type === 'removed').length;
 
   const scanRows = await db
     .select()
@@ -35,10 +35,10 @@ export default async function Page() {
     .where(and(eq(sites.ownerId, user.id), gte(scans.startedAt, since)));
   
   const total = scanRows.length;
-  const failed = scanRows.filter(row => row.scans.status !== 'success').length;
-  const completedScans = scanRows.filter(row => row.scans.finishedAt && row.scans.startedAt);
+  const failed = scanRows.filter((row: { scans: { status: string; }; }) => row.scans.status !== 'success').length;
+  const completedScans = scanRows.filter((row: { scans: { finishedAt: any; startedAt: any; }; }) => row.scans.finishedAt && row.scans.startedAt);
   const duration = completedScans.length > 0 
-    ? completedScans.reduce((sum, row) => {
+    ? completedScans.reduce((sum: number, row: { scans: { startedAt: string | number | Date; finishedAt: string | number | Date; }; }) => {
         const start = new Date(row.scans.startedAt!).getTime();
         const end = new Date(row.scans.finishedAt!).getTime();
         return sum + (end - start) / 1000; // convert to seconds

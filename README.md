@@ -1,6 +1,6 @@
 # Sitemap Monitor
 
-Sitemap Monitor 是一个基于 Next.js 15 的示例项目，用于接入站点并持续监控 sitemap 变更。项目整合了 Drizzle ORM、LibSQL/SQLite、本地队列与 Webhook 通知等能力，展示了从前端到 API 的完整链路。
+Sitemap Monitor 是一个基于 Next.js 15 的示例项目，用于接入站点并持续监控 sitemap 变更。项目整合了 Drizzle ORM、SQLite、本地队列与 Webhook 通知等能力，展示了从前端到 API 的完整链路。
 
 ## 目录
 
@@ -14,7 +14,7 @@ Sitemap Monitor 是一个基于 Next.js 15 的示例项目，用于接入站点�
 - [批量导入指南](#批量导入指南)
 - [API 说明](#api-说明)
 - [数据库结构](#数据库结构)
-- [Cloudflare 免费部署](#cloudflare-免费部署)
+
 - [开发提示](#开发提示)
 
 ## 功能概览
@@ -37,7 +37,7 @@ Sitemap Monitor 是一个基于 Next.js 15 的示例项目，用于接入站点�
 
 - [Next.js 15.5](https://nextjs.org/)（App Router）
 - [Hono](https://hono.dev/) 作为 API 路由适配器（参见 `app/api/[...hono]/route.ts`）
-- [Drizzle ORM](https://orm.drizzle.team/) + [LibSQL](https://libsql.org/) / SQLite 数据库
+- [Drizzle ORM](https://orm.drizzle.team/) + SQLite 数据库
 - [fast-xml-parser](https://github.com/NaturalIntelligence/fast-xml-parser) 解析 sitemap
 - UI 基于 Tailwind CSS、Radix UI 组件（见 `components/ui`）
 
@@ -58,7 +58,7 @@ Sitemap Monitor 是一个基于 Next.js 15 的示例项目，用于接入站点�
 
    - 复制 `.env.example` 为 `.env`。
    - 默认 `.env` 已改为使用本地 SQLite：`DB_URL=file:./drizzle/local.sqlite`。
-   - 如需对接 Turso/LibSQL 云服务，填写 `DB_URL=libsql://<instance>.turso.io` 与 `DB_AUTH_TOKEN=<token>`。
+
    - 设置 `CRON_TOKEN`、`WEBHOOK_SECRET` 等其他变量：
      ```env
      CRON_TOKEN=your-cron-secret
@@ -253,9 +253,7 @@ Sitemap Monitor 是一个基于 Next.js 15 的示例项目，用于接入站点�
 
 迁移文件存放于 `drizzle/`，初始迁移为 `0000_sleepy_stone_men.sql`。
 
-## Cloudflare 免费部署
 
-如果需要依托 Cloudflare Free 套餐上线项目并启用 Cloudflare D1 数据库、Workers Cron 定时触发 `/api/cron/scan`，请参考 `docs/cloudflare-deployment.md`。文档涵盖 D1 绑定与迁移、Pages 环境变量、运行时代码适配以及 Cron Worker 示例脚本，可按需调优。
 
 ## 开发提示
 
