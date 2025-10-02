@@ -9,6 +9,7 @@ import { desc, eq } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
+
 type ScanWithSite = {
   id: string;
   siteId: string;

@@ -16,6 +16,7 @@ import { getCfBindingEnvSafely } from "@/lib/cf";
 
 export const dynamic = "force-dynamic";
 
+
 function getParam(
   sp: Record<string, string | string[]> | undefined,
   key: string,

@@ -9,6 +9,7 @@ import { ChangeTrendChart, type ChangeTrendPoint } from "./_components/change-tr
 import { getCfBindingEnvSafely } from "@/lib/cf";
 
 
+
 export default async function Page() {
   const user = await requireUser({ redirectTo: "/dashboard" });
   const db = resolveDb({ bindingEnv: getCfBindingEnvSafely() }) as any;

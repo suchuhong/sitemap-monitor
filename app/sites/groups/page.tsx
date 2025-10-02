@@ -8,9 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { createGroupAction, updateGroupAction } from "./actions";
 import { DeleteGroupButton } from "./delete-group-button";
+import { getCfBindingEnvSafely } from "@/lib/cf";
 
 export const dynamic = "force-dynamic";
-export const dynamic = "force-dynamic";
+
 
 export default async function SiteGroupsPage({
   searchParams,

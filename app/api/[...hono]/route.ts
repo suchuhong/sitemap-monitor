@@ -292,6 +292,8 @@ app.post("/sites/:id/scan", async (c) => {
   return c.json({ ok: true, status: "queued", scanId });
 });
 
+
+
 export const GET = handle(app);
 export const POST = handle(app);
 export const PATCH = handle(app);

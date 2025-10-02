@@ -27,6 +27,12 @@ const globalForDb = globalThis as typeof globalThis & {
 
 function detectEdgeRuntime(hint?: "edge" | "node") {
   if (hint) return hint === "edge";
+
+  // In development mode, always use Node.js runtime for better compatibility
+  if (process.env.NODE_ENV === 'development') {
+    return false;
+  }
+
   // Prefer robust detection used by next-on-pages: Node sets process.release.name === 'node'
   // In Edge/Workers this is absent or different
   // eslint-disable-next-line no-restricted-globals
@@ -50,7 +56,7 @@ export function resolveDb(opts: ResolveDbOpts = {}): DatabaseClient {
     return globalForDb.__d1Db;
   }
 
-// Detect Edge runtime based on hint or environment
+  // Detect Edge runtime based on hint or environment
   const useEdge = detectEdgeRuntime(runtimeHint);
 
   // 2) Edge path: strictly require D1 binding to avoid bundling libsql clients in Pages build

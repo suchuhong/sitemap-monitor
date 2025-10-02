@@ -20,6 +20,7 @@ import { SitemapTable } from "./_components/sitemap-table";
 
 export const dynamic = "force-dynamic";
 
+
 export default async function SiteDetailPage({
   params,
 }: {
