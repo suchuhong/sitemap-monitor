@@ -1,73 +1,114 @@
 {
-  "version": "6",
-  "dialect": "sqlite",
-  "id": "6fbd1d6a-c1a5-426b-8cca-cb9c2905533d",
+  "id": "454e04b9-866e-438a-8934-65ad14cce035",
   "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
   "tables": {
-    "changes": {
-      "name": "changes",
+    "public.sitemap_monitor_changes": {
+      "name": "sitemap_monitor_changes",
+      "schema": "",
       "columns": {
         "id": {
           "name": "id",
           "type": "text",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "site_id": {
           "name": "site_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
+        },
+        "scan_id": {
+          "name": "scan_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "url_id": {
           "name": "url_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "type": {
           "name": "type",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "detail": {
           "name": "detail",
           "type": "text",
           "primaryKey": false,
+          "notNull": false
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "assignee": {
+          "name": "assignee",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
           "notNull": false,
-          "autoincrement": false
+          "default": "'open'"
         },
         "occurred_at": {
           "name": "occurred_at",
-          "type": "integer",
+          "type": "timestamp",
           "primaryKey": false,
           "notNull": false,
-          "autoincrement": false,
-          "default": "(unixepoch())"
+          "default": "now()"
         }
       },
       "indexes": {},
       "foreignKeys": {
-        "changes_site_id_sites_id_fk": {
-          "name": "changes_site_id_sites_id_fk",
-          "tableFrom": "changes",
-          "tableTo": "sites",
-          "columnsFrom": ["site_id"],
-          "columnsTo": ["id"],
+        "sitemap_monitor_changes_site_id_sitemap_monitor_sites_id_fk": {
+          "name": "sitemap_monitor_changes_site_id_sitemap_monitor_sites_id_fk",
+          "tableFrom": "sitemap_monitor_changes",
+          "tableTo": "sitemap_monitor_sites",
+          "columnsFrom": [
+            "site_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "changes_url_id_urls_id_fk": {
-          "name": "changes_url_id_urls_id_fk",
-          "tableFrom": "changes",
-          "tableTo": "urls",
-          "columnsFrom": ["url_id"],
-          "columnsTo": ["id"],
+        "sitemap_monitor_changes_scan_id_sitemap_monitor_scans_id_fk": {
+          "name": "sitemap_monitor_changes_scan_id_sitemap_monitor_scans_id_fk",
+          "tableFrom": "sitemap_monitor_changes",
+          "tableTo": "sitemap_monitor_scans",
+          "columnsFrom": [
+            "scan_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "sitemap_monitor_changes_url_id_sitemap_monitor_urls_id_fk": {
+          "name": "sitemap_monitor_changes_url_id_sitemap_monitor_urls_id_fk",
+          "tableFrom": "sitemap_monitor_changes",
+          "tableTo": "sitemap_monitor_urls",
+          "columnsFrom": [
+            "url_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -75,44 +116,101 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {}
     },
-    "scans": {
-      "name": "scans",
+    "public.sitemap_monitor_notification_channels": {
+      "name": "sitemap_monitor_notification_channels",
+      "schema": "",
       "columns": {
         "id": {
           "name": "id",
           "type": "text",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "site_id": {
           "name": "site_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "target": {
+          "name": "target",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "secret": {
+          "name": "secret",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "sitemap_monitor_notification_channels_site_id_sitemap_monitor_sites_id_fk": {
+          "name": "sitemap_monitor_notification_channels_site_id_sitemap_monitor_sites_id_fk",
+          "tableFrom": "sitemap_monitor_notification_channels",
+          "tableTo": "sitemap_monitor_sites",
+          "columnsFrom": [
+            "site_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
+    },
+    "public.sitemap_monitor_scans": {
+      "name": "sitemap_monitor_scans",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "site_id": {
+          "name": "site_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
         },
         "started_at": {
           "name": "started_at",
-          "type": "integer",
+          "type": "timestamp",
           "primaryKey": false,
           "notNull": false,
-          "autoincrement": false,
-          "default": "(unixepoch())"
+          "default": "now()"
         },
         "finished_at": {
           "name": "finished_at",
-          "type": "integer",
+          "type": "timestamp",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "total_sitemaps": {
           "name": "total_sitemaps",
           "type": "integer",
           "primaryKey": false,
           "notNull": false,
-          "autoincrement": false,
           "default": 0
         },
         "total_urls": {
@@ -120,7 +218,6 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": false,
-          "autoincrement": false,
           "default": 0
         },
         "added": {
@@ -128,7 +225,6 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": false,
-          "autoincrement": false,
           "default": 0
         },
         "removed": {
@@ -136,7 +232,13 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": false,
-          "autoincrement": false,
+          "default": 0
+        },
+        "updated": {
+          "name": "updated",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
           "default": 0
         },
         "status": {
@@ -144,25 +246,27 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false,
-          "autoincrement": false,
           "default": "'running'"
         },
         "error": {
           "name": "error",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         }
       },
       "indexes": {},
       "foreignKeys": {
-        "scans_site_id_sites_id_fk": {
-          "name": "scans_site_id_sites_id_fk",
-          "tableFrom": "scans",
-          "tableTo": "sites",
-          "columnsFrom": ["site_id"],
-          "columnsTo": ["id"],
+        "sitemap_monitor_scans_site_id_sitemap_monitor_sites_id_fk": {
+          "name": "sitemap_monitor_scans_site_id_sitemap_monitor_sites_id_fk",
+          "tableFrom": "sitemap_monitor_scans",
+          "tableTo": "sitemap_monitor_sites",
+          "columnsFrom": [
+            "site_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -170,84 +274,148 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {}
     },
-    "sitemaps": {
-      "name": "sitemaps",
+    "public.sitemap_monitor_site_groups": {
+      "name": "sitemap_monitor_site_groups",
+      "schema": "",
       "columns": {
         "id": {
           "name": "id",
           "type": "text",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "color": {
+          "name": "color",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "sitemap_monitor_site_groups_owner_id_sitemap_monitor_users_id_fk": {
+          "name": "sitemap_monitor_site_groups_owner_id_sitemap_monitor_users_id_fk",
+          "tableFrom": "sitemap_monitor_site_groups",
+          "tableTo": "sitemap_monitor_users",
+          "columnsFrom": [
+            "owner_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
+    },
+    "public.sitemap_monitor_sitemaps": {
+      "name": "sitemap_monitor_sitemaps",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
         },
         "site_id": {
           "name": "site_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "url": {
           "name": "url",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "is_index": {
           "name": "is_index",
-          "type": "integer",
+          "type": "boolean",
           "primaryKey": false,
           "notNull": false,
-          "autoincrement": false,
           "default": false
         },
         "last_etag": {
           "name": "last_etag",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "last_modified": {
           "name": "last_modified",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "last_status": {
           "name": "last_status",
           "type": "integer",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "discovered_at": {
           "name": "discovered_at",
-          "type": "integer",
+          "type": "timestamp",
           "primaryKey": false,
           "notNull": false,
-          "autoincrement": false,
-          "default": "(unixepoch())"
+          "default": "now()"
         },
         "updated_at": {
           "name": "updated_at",
-          "type": "integer",
+          "type": "timestamp",
           "primaryKey": false,
           "notNull": false,
-          "autoincrement": false,
-          "default": "(unixepoch())"
+          "default": "now()"
         }
       },
       "indexes": {},
       "foreignKeys": {
-        "sitemaps_site_id_sites_id_fk": {
-          "name": "sitemaps_site_id_sites_id_fk",
-          "tableFrom": "sitemaps",
-          "tableTo": "sites",
-          "columnsFrom": ["site_id"],
-          "columnsTo": ["id"],
+        "sitemap_monitor_sitemaps_site_id_sitemap_monitor_sites_id_fk": {
+          "name": "sitemap_monitor_sitemaps_site_id_sitemap_monitor_sites_id_fk",
+          "tableFrom": "sitemap_monitor_sitemaps",
+          "tableTo": "sitemap_monitor_sites",
+          "columnsFrom": [
+            "site_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -255,70 +423,113 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {}
     },
-    "sites": {
-      "name": "sites",
+    "public.sitemap_monitor_sites": {
+      "name": "sitemap_monitor_sites",
+      "schema": "",
       "columns": {
         "id": {
           "name": "id",
           "type": "text",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "owner_id": {
           "name": "owner_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "root_url": {
           "name": "root_url",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "robots_url": {
           "name": "robots_url",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "enabled": {
           "name": "enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": true
+        },
+        "tags": {
+          "name": "tags",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "group_id": {
+          "name": "group_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "scan_priority": {
+          "name": "scan_priority",
           "type": "integer",
           "primaryKey": false,
           "notNull": false,
-          "autoincrement": false,
-          "default": true
+          "default": 1
+        },
+        "scan_interval_minutes": {
+          "name": "scan_interval_minutes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 1440
+        },
+        "last_scan_at": {
+          "name": "last_scan_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
-          "type": "integer",
+          "type": "timestamp",
           "primaryKey": false,
           "notNull": false,
-          "autoincrement": false,
-          "default": "(unixepoch())"
+          "default": "now()"
         },
         "updated_at": {
           "name": "updated_at",
-          "type": "integer",
+          "type": "timestamp",
           "primaryKey": false,
           "notNull": false,
-          "autoincrement": false,
-          "default": "(unixepoch())"
+          "default": "now()"
         }
       },
       "indexes": {},
       "foreignKeys": {
-        "sites_owner_id_users_id_fk": {
-          "name": "sites_owner_id_users_id_fk",
-          "tableFrom": "sites",
-          "tableTo": "users",
-          "columnsFrom": ["owner_id"],
-          "columnsTo": ["id"],
+        "sitemap_monitor_sites_owner_id_sitemap_monitor_users_id_fk": {
+          "name": "sitemap_monitor_sites_owner_id_sitemap_monitor_users_id_fk",
+          "tableFrom": "sitemap_monitor_sites",
+          "tableTo": "sitemap_monitor_users",
+          "columnsFrom": [
+            "owner_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "sitemap_monitor_sites_group_id_sitemap_monitor_site_groups_id_fk": {
+          "name": "sitemap_monitor_sites_group_id_sitemap_monitor_site_groups_id_fk",
+          "tableFrom": "sitemap_monitor_sites",
+          "tableTo": "sitemap_monitor_site_groups",
+          "columnsFrom": [
+            "group_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -326,100 +537,99 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {}
     },
-    "urls": {
-      "name": "urls",
+    "public.sitemap_monitor_urls": {
+      "name": "sitemap_monitor_urls",
+      "schema": "",
       "columns": {
         "id": {
           "name": "id",
           "type": "text",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "site_id": {
           "name": "site_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "sitemap_id": {
           "name": "sitemap_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "loc": {
           "name": "loc",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "lastmod": {
           "name": "lastmod",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "changefreq": {
           "name": "changefreq",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "priority": {
           "name": "priority",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "first_seen_at": {
           "name": "first_seen_at",
-          "type": "integer",
+          "type": "timestamp",
           "primaryKey": false,
           "notNull": false,
-          "autoincrement": false,
-          "default": "(unixepoch())"
+          "default": "now()"
         },
         "last_seen_at": {
           "name": "last_seen_at",
-          "type": "integer",
+          "type": "timestamp",
           "primaryKey": false,
           "notNull": false,
-          "autoincrement": false,
-          "default": "(unixepoch())"
+          "default": "now()"
         },
         "status": {
           "name": "status",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
-          "autoincrement": false,
           "default": "'active'"
         }
       },
       "indexes": {},
       "foreignKeys": {
-        "urls_site_id_sites_id_fk": {
-          "name": "urls_site_id_sites_id_fk",
-          "tableFrom": "urls",
-          "tableTo": "sites",
-          "columnsFrom": ["site_id"],
-          "columnsTo": ["id"],
+        "sitemap_monitor_urls_site_id_sitemap_monitor_sites_id_fk": {
+          "name": "sitemap_monitor_urls_site_id_sitemap_monitor_sites_id_fk",
+          "tableFrom": "sitemap_monitor_urls",
+          "tableTo": "sitemap_monitor_sites",
+          "columnsFrom": [
+            "site_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "urls_sitemap_id_sitemaps_id_fk": {
-          "name": "urls_sitemap_id_sitemaps_id_fk",
-          "tableFrom": "urls",
-          "tableTo": "sitemaps",
-          "columnsFrom": ["sitemap_id"],
-          "columnsTo": ["id"],
+        "sitemap_monitor_urls_sitemap_id_sitemap_monitor_sitemaps_id_fk": {
+          "name": "sitemap_monitor_urls_sitemap_id_sitemap_monitor_sitemaps_id_fk",
+          "tableFrom": "sitemap_monitor_urls",
+          "tableTo": "sitemap_monitor_sitemaps",
+          "columnsFrom": [
+            "sitemap_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -427,91 +637,91 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {}
     },
-    "users": {
-      "name": "users",
+    "public.sitemap_monitor_users": {
+      "name": "sitemap_monitor_users",
+      "schema": "",
       "columns": {
         "id": {
           "name": "id",
           "type": "text",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "email": {
           "name": "email",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "created_at": {
           "name": "created_at",
-          "type": "integer",
+          "type": "timestamp",
           "primaryKey": false,
           "notNull": false,
-          "autoincrement": false,
-          "default": "(unixepoch())"
+          "default": "now()"
         }
       },
-      "indexes": {
-        "users_email_unique": {
-          "name": "users_email_unique",
-          "columns": ["email"],
-          "isUnique": true
-        }
-      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {
+        "sitemap_monitor_users_email_unique": {
+          "name": "sitemap_monitor_users_email_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "email"
+          ]
+        }
+      }
     },
-    "webhooks": {
-      "name": "webhooks",
+    "public.sitemap_monitor_webhooks": {
+      "name": "sitemap_monitor_webhooks",
+      "schema": "",
       "columns": {
         "id": {
           "name": "id",
           "type": "text",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "site_id": {
           "name": "site_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "target_url": {
           "name": "target_url",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "secret": {
           "name": "secret",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
-          "type": "integer",
+          "type": "timestamp",
           "primaryKey": false,
           "notNull": false,
-          "autoincrement": false,
-          "default": "(unixepoch())"
+          "default": "now()"
         }
       },
       "indexes": {},
       "foreignKeys": {
-        "webhooks_site_id_sites_id_fk": {
-          "name": "webhooks_site_id_sites_id_fk",
-          "tableFrom": "webhooks",
-          "tableTo": "sites",
-          "columnsFrom": ["site_id"],
-          "columnsTo": ["id"],
+        "sitemap_monitor_webhooks_site_id_sitemap_monitor_sites_id_fk": {
+          "name": "sitemap_monitor_webhooks_site_id_sitemap_monitor_sites_id_fk",
+          "tableFrom": "sitemap_monitor_webhooks",
+          "tableTo": "sitemap_monitor_sites",
+          "columnsFrom": [
+            "site_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -521,12 +731,11 @@
     }
   },
   "enums": {},
+  "schemas": {},
+  "sequences": {},
   "_meta": {
+    "columns": {},
     "schemas": {},
-    "tables": {},
-    "columns": {}
-  },
-  "internal": {
-    "indexes": {}
+    "tables": {}
   }
 }
