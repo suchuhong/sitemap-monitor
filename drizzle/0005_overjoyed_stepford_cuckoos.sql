@@ -1,1 +1,0 @@
-DROP TABLE `observability_logs`;
