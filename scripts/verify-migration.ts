@@ -30,19 +30,19 @@ async function verifyMigration() {
     console.log(`   - Scans: ${counts[5][0].count}`);
     console.log(`   - Changes: ${counts[6][0].count}`);
     console.log(`   - Notification Channels: ${counts[7][0].count}`);
-    
+
     const total = counts.reduce((sum, c) => sum + c[0].count, 0);
     console.log(`   总计: ${total} 条记录\n`);
 
     // 抽样检查数据
     console.log("🔬 抽样检查数据...");
-    
+
     const sampleUser = await db.select().from(users).limit(1);
     console.log(`   ✅ Users 表有数据: ${sampleUser.length > 0}`);
-    
+
     const sampleSite = await db.select().from(sites).limit(1);
     console.log(`   ✅ Sites 表有数据: ${sampleSite.length > 0}`);
-    
+
     const sampleUrl = await db.select().from(urls).limit(1);
     console.log(`   ✅ URLs 表有数据: ${sampleUrl.length > 0}`);
 

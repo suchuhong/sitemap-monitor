@@ -279,4 +279,3 @@ PostgreSQL 迁移已成功完成！
 ---
 
 *迁移完成时间: 2025年10月4日*  
-*迁移执行者: Kiro AI Assistant*
