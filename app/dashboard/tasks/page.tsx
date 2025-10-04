@@ -55,29 +55,33 @@ export default async function TasksPage() {
       .limit(100),
   ]);
 
-  const scanRows: ScanWithSite[] = rawScanRows.map((row: any) => ({
-    id: row.scans.id,
-    siteId: row.scans.siteId,
-    rootUrl: row.sites.rootUrl,
-    status: row.scans.status,
-    totalUrls: row.scans.totalUrls,
-    added: row.scans.added,
-    removed: row.scans.removed,
-    updated: row.scans.updated,
-    startedAt: row.scans.startedAt,
-    finishedAt: row.scans.finishedAt,
-    error: row.scans.error,
-  }));
+  const scanRows: ScanWithSite[] = rawScanRows
+    .filter((row: any) => row.scans && row.sites)
+    .map((row: any) => ({
+      id: row.scans.id,
+      siteId: row.scans.siteId,
+      rootUrl: row.sites.rootUrl,
+      status: row.scans.status,
+      totalUrls: row.scans.totalUrls,
+      added: row.scans.added,
+      removed: row.scans.removed,
+      updated: row.scans.updated,
+      startedAt: row.scans.startedAt,
+      finishedAt: row.scans.finishedAt,
+      error: row.scans.error,
+    }));
 
-  const changeRows: ChangeRecord[] = rawChangeRows.map((row: any) => ({
-    id: row.changes.id,
-    siteId: row.changes.siteId,
-    rootUrl: row.sites.rootUrl,
-    type: row.changes.type,
-    detail: row.changes.detail,
-    occurredAt: row.changes.occurredAt,
-    source: row.changes.source,
-  }));
+  const changeRows: ChangeRecord[] = rawChangeRows
+    .filter((row: any) => row.changes && row.sites)
+    .map((row: any) => ({
+      id: row.changes.id,
+      siteId: row.changes.siteId,
+      rootUrl: row.sites.rootUrl,
+      type: row.changes.type,
+      detail: row.changes.detail,
+      occurredAt: row.changes.occurredAt,
+      source: row.changes.source,
+    }));
 
   const statusCounts = scanRows.reduce(
     (acc, scan) => {

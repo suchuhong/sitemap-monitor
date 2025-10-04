@@ -59,6 +59,8 @@ export default async function Page() {
   const siteDataMap = new Map<string, { siteId: string; rootUrl: string }>();
   
   for (const row of topSiteRows) {
+    if (!row.sites) continue;
+    
     const siteId = row.sites.id;
     const rootUrl = row.sites.rootUrl;
     
