@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { resolveDb } from "@/lib/db";
 import { sites, changes, scans } from "@/lib/drizzle/schema";
-import { gte, eq, and } from "drizzle-orm";
+import { gte, eq, and, sql } from "drizzle-orm";
 import { requireUser } from "@/lib/auth/session";
 import { ChangeTrendChart, type ChangeTrendPoint } from "./_components/change-trend-chart";
 
@@ -15,35 +15,41 @@ export default async function Page() {
   const db = resolveDb() as any;
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-  const siteRows = await db
-    .select()
-    .from(sites)
-    .where(eq(sites.ownerId, user.id));
-  const changeRows = await db
-    .select()
-    .from(changes)
-    .innerJoin(sites, eq(changes.siteId, sites.id))
-    .where(and(eq(sites.ownerId, user.id), gte(changes.occurredAt, since)));
+  // 使用并行查询和聚合优化性能
+  const [siteRows, changeStats] = await Promise.all([
+    db.select().from(sites).where(eq(sites.ownerId, user.id)),
+    db
+      .select({
+        type: changes.type,
+        count: sql<number>`COUNT(*)::int`,
+      })
+      .from(changes)
+      .innerJoin(sites, eq(changes.siteId, sites.id))
+      .where(and(eq(sites.ownerId, user.id), gte(changes.occurredAt, since)))
+      .groupBy(changes.type),
+  ]);
   
-  const added = changeRows.filter((row: { changes: { type: string; }; }) => row.changes?.type === 'added').length;
-  const removed = changeRows.filter((row: { changes: { type: string; }; }) => row.changes?.type === 'removed').length;
+  const added = changeStats.find((s: any) => s.type === 'added')?.count || 0;
+  const removed = changeStats.find((s: any) => s.type === 'removed')?.count || 0;
 
-  const scanRows = await db
-    .select()
+  // 使用聚合查询优化扫描统计
+  const scanStats = await db
+    .select({
+      total: sql<number>`COUNT(*)::int`,
+      failed: sql<number>`COUNT(CASE WHEN ${scans.status} != 'success' THEN 1 END)::int`,
+      avgDuration: sql<number>`AVG(EXTRACT(EPOCH FROM (${scans.finishedAt} - ${scans.startedAt})))`,
+    })
     .from(scans)
     .innerJoin(sites, eq(scans.siteId, sites.id))
-    .where(and(eq(sites.ownerId, user.id), gte(scans.startedAt, since)));
+    .where(and(
+      eq(sites.ownerId, user.id), 
+      gte(scans.startedAt, since),
+      sql`${scans.finishedAt} IS NOT NULL`
+    ));
   
-  const total = scanRows.length;
-  const failed = scanRows.filter((row: { scans: { status: string; }; }) => row.scans?.status !== 'success').length;
-  const completedScans = scanRows.filter((row: { scans: { finishedAt: any; startedAt: any; }; }) => row.scans?.finishedAt && row.scans?.startedAt);
-  const duration = completedScans.length > 0 
-    ? completedScans.reduce((sum: number, row: { scans: { startedAt: string | number | Date; finishedAt: string | number | Date; }; }) => {
-        const start = new Date(row.scans?.startedAt!).getTime();
-        const end = new Date(row.scans?.finishedAt!).getTime();
-        return sum + (end - start) / 1000; // convert to seconds
-      }, 0) / completedScans.length
-    : 0;
+  const total = scanStats[0]?.total || 0;
+  const failed = scanStats[0]?.failed || 0;
+  const duration = scanStats[0]?.avgDuration || 0;
 
   const topSiteRows = await db
     .select()
@@ -86,18 +92,25 @@ export default async function Page() {
     .slice(0, 5);
 
   const trendWindowStart = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  
+  // 使用 SQL 聚合查询优化性能，而不是在应用层处理大量数据
   const trendChangeRows = await db
-    .select()
+    .select({
+      day: sql<string>`DATE(${changes.occurredAt})`,
+      type: changes.type,
+      count: sql<number>`COUNT(*)::int`,
+    })
     .from(changes)
     .innerJoin(sites, eq(changes.siteId, sites.id))
-    .where(and(eq(sites.ownerId, user.id), gte(changes.occurredAt, trendWindowStart)));
+    .where(and(eq(sites.ownerId, user.id), gte(changes.occurredAt, trendWindowStart)))
+    .groupBy(sql`DATE(${changes.occurredAt})`, changes.type)
+    .orderBy(sql`DATE(${changes.occurredAt})`);
 
   // Group changes by day and count by type
   const trendMap = new Map<string, { added: number; removed: number; updated: number }>();
   
   for (const row of trendChangeRows) {
-    if (!row.changes) continue;
-    const day = getDayKey(row.changes.occurredAt);
+    const day = row.day;
     if (!day) continue;
     
     if (!trendMap.has(day)) {
@@ -105,9 +118,10 @@ export default async function Page() {
     }
     
     const dayData = trendMap.get(day)!;
-    if (row.changes.type === 'added') dayData.added++;
-    else if (row.changes.type === 'removed') dayData.removed++;
-    else if (row.changes.type === 'updated') dayData.updated++;
+    const count = Number(row.count || 0);
+    if (row.type === 'added') dayData.added += count;
+    else if (row.type === 'removed') dayData.removed += count;
+    else if (row.type === 'updated') dayData.updated += count;
   }
 
   const changeTrendRows = Array.from(trendMap.entries())
@@ -412,19 +426,4 @@ export default async function Page() {
   );
 }
 
-function getDayKey(value: unknown) {
-  const date = normalizeToDate(value);
-  return date ? date.toISOString().split('T')[0] : null;
-}
 
-function normalizeToDate(value: unknown) {
-  if (!value) return null;
-  if (value instanceof Date) return value;
-
-  const numeric = typeof value === 'string' ? Number(value) : value;
-  if (typeof numeric !== 'number' || Number.isNaN(numeric)) return null;
-
-  // Values persisted via sqlite `unixepoch()` are seconds; record-level assignments use JS Date (ms)
-  const ms = numeric > 1e12 ? numeric : numeric * 1000;
-  return new Date(ms);
-}
