@@ -51,45 +51,22 @@ export default async function Page() {
   const failed = scanStats[0]?.failed || 0;
   const duration = scanStats[0]?.avgDuration || 0;
 
-  const topSiteRows = await db
-    .select()
+  // 使用 SQL 聚合查询优化活跃站点排行
+  const topSites = await db
+    .select({
+      siteId: sites.id,
+      rootUrl: sites.rootUrl,
+      scanCount: sql<number>`COUNT(${scans.id})::int`,
+    })
     .from(sites)
     .leftJoin(
       scans,
       and(eq(scans.siteId, sites.id), gte(scans.startedAt, since)),
     )
-    .where(eq(sites.ownerId, user.id));
-
-  // Group scans by siteId and count them
-  const siteScansMap = new Map<string, number>();
-  const siteDataMap = new Map<string, { siteId: string; rootUrl: string }>();
-  
-  for (const row of topSiteRows) {
-    if (!row.sites) continue;
-    
-    const siteId = row.sites.id;
-    const rootUrl = row.sites.rootUrl;
-    
-    // Store site data
-    if (!siteDataMap.has(siteId)) {
-      siteDataMap.set(siteId, { siteId, rootUrl });
-    }
-    
-    // Count scans
-    if (row.scans?.id) {
-      siteScansMap.set(siteId, (siteScansMap.get(siteId) || 0) + 1);
-    } else if (!siteScansMap.has(siteId)) {
-      siteScansMap.set(siteId, 0);
-    }
-  }
-
-  const topSites = Array.from(siteDataMap.values())
-    .map(site => ({
-      ...site,
-      scanCount: siteScansMap.get(site.siteId) || 0,
-    }))
-    .sort((a, b) => b.scanCount - a.scanCount)
-    .slice(0, 5);
+    .where(eq(sites.ownerId, user.id))
+    .groupBy(sites.id, sites.rootUrl)
+    .orderBy(sql`COUNT(${scans.id}) DESC`)
+    .limit(5);
 
   const trendWindowStart = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   
@@ -333,7 +310,7 @@ export default async function Page() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {topSites.map((s, index) => (
+              {topSites.map((s: any, index: number) => (
                 <div key={s.siteId} className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
                   <div className="flex items-center space-x-3">
                     <div className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
