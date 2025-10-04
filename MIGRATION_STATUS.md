@@ -46,7 +46,7 @@
 
 ## 已修复的问题
 
-### 问题 1: Join 查询返回 undefined
+### 问题 1: Join 查询返回 undefined (Dashboard)
 **错误**: `Cannot read properties of undefined (reading 'type')`  
 **原因**: PostgreSQL 的 join 查询返回结构与 SQLite 不同  
 **修复**: 添加可选链操作符 `?.` 和 null 检查
@@ -57,6 +57,36 @@ row.changes.type === 'added'
 
 // 修复后
 row.changes?.type === 'added'
+```
+
+### 问题 2: Join 查询返回 undefined (Sites)
+**错误**: `Cannot read properties of undefined (reading 'id')`  
+**原因**: leftJoin 可能返回 null 的关联表数据  
+**修复**: 添加 null 检查
+
+```typescript
+// 修复前
+for (const row of topSiteRows) {
+  const siteId = row.sites.id;
+  ...
+}
+
+// 修复后
+for (const row of topSiteRows) {
+  if (!row.sites) continue;
+  const siteId = row.sites.id;
+  ...
+}
+```
+
+### 问题 3: Tasks 页面 map 操作
+**修复**: 在 map 前添加 filter 过滤掉 undefined 的行
+
+```typescript
+// 修复后
+const scanRows = rawScanRows
+  .filter((row: any) => row.scans && row.sites)
+  .map((row: any) => ({ ... }));
 ```
 
 ## 测试建议
@@ -85,6 +115,8 @@ pnpm dev
 ## Git 提交历史
 
 ```
+f1cb252 fix: 修复更多 join 查询中的 undefined 问题
+237a635 docs: 添加迁移状态文档
 65a05ee fix: 修复 PostgreSQL join 查询中的 undefined 问题
 12ecadd docs: 添加数据迁移完成报告
 98787a6 feat: 完成数据迁移
