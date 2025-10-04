@@ -50,6 +50,53 @@ app.post("/cron/scan", async (c) => {
   return c.json(result);
 });
 
+app.post("/cron/cleanup", async (c) => {
+  const expectedToken = process.env.CRON_TOKEN;
+  if (expectedToken) {
+    const authHeader = c.req.header("authorization") ?? "";
+    const bearerToken = authHeader.startsWith("Bearer ")
+      ? authHeader.slice("Bearer ".length)
+      : undefined;
+    const queryToken = new URL(c.req.url).searchParams.get("token") ?? undefined;
+    const headerToken = c.req.header("x-cron-token") ?? undefined;
+    const provided = bearerToken ?? headerToken ?? queryToken ?? "";
+    if (provided !== expectedToken) {
+      return c.json({ error: "unauthorized" }, 401);
+    }
+  }
+
+  // 清理卡住的扫描（超过 15 分钟）
+  const db = resolveDb() as any;
+  const now = Date.now();
+  const timeoutThreshold = new Date(now - 15 * 60 * 1000);
+
+  const runningScans = await db
+    .select()
+    .from(scans)
+    .where(eq(scans.status, "running"));
+
+  let cleanedCount = 0;
+  for (const scan of runningScans) {
+    if (scan.startedAt && new Date(scan.startedAt) < timeoutThreshold) {
+      await db
+        .update(scans)
+        .set({
+          status: "failed",
+          finishedAt: new Date(),
+          error: "Scan timeout - exceeded 15 minutes",
+        })
+        .where(eq(scans.id, scan.id));
+      cleanedCount++;
+    }
+  }
+
+  return c.json({ 
+    ok: true, 
+    cleaned: cleanedCount,
+    message: `Cleaned up ${cleanedCount} stuck scans` 
+  });
+});
+
 app.use("*", async (c, next) => {
   const sessionId = getCookie(c, SESSION_COOKIE_NAME);
   if (!sessionId) return c.json({ error: "unauthorized" }, 401);

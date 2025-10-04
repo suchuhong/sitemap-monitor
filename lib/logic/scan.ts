@@ -22,6 +22,27 @@ let processing = false;
 export async function cronScan(maxSites = 3) {
   const db = resolveDb() as any;
   const now = Date.now();
+  
+  // 首先清理超时的扫描（超过 15 分钟仍在运行的）
+  const timeoutThreshold = new Date(now - 15 * 60 * 1000);
+  const runningScans = await db
+    .select()
+    .from(scans)
+    .where(eq(scans.status, "running"));
+  
+  for (const scan of runningScans) {
+    if (scan.startedAt && new Date(scan.startedAt) < timeoutThreshold) {
+      await db
+        .update(scans)
+        .set({
+          status: "failed",
+          finishedAt: new Date(),
+          error: "Scan timeout - exceeded 15 minutes",
+        })
+        .where(eq(scans.id, scan.id));
+    }
+  }
+  
   const activeSites = await db
     .select({
       id: sites.id,
@@ -55,10 +76,41 @@ export async function cronScan(maxSites = 3) {
     .slice(0, maxSites); // 限制每次扫描的站点数量，避免 Vercel 超时
 
   const results: Array<Record<string, unknown>> = [];
+  
+  // 直接执行扫描，不使用队列（Serverless 环境中队列不可靠）
   for (const site of dueSites) {
     try {
-      const { scanId } = await enqueueScan(site.id);
-      results.push({ siteId: site.id, scanId, status: "queued" });
+      const scanId = generateId();
+      await db
+        .insert(scans)
+        .values({ id: scanId, siteId: site.id, status: "queued", startedAt: new Date() });
+      
+      // 使用 Promise.race 实现超时保护
+      const scanPromise = executeScan({ scanId, siteId: site.id });
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("Scan timeout")), 8000)
+      );
+      
+      try {
+        await Promise.race([scanPromise, timeoutPromise]);
+        results.push({ siteId: site.id, scanId, status: "completed" });
+      } catch (timeoutErr) {
+        // 超时了，标记为失败
+        await db
+          .update(scans)
+          .set({
+            status: "failed",
+            finishedAt: new Date(),
+            error: "Execution timeout",
+          })
+          .where(eq(scans.id, scanId));
+        results.push({ 
+          siteId: site.id, 
+          scanId, 
+          status: "timeout",
+          error: "Execution timeout" 
+        });
+      }
     } catch (err) {
       results.push({
         siteId: site.id,
@@ -75,7 +127,7 @@ export async function cronScan(maxSites = 3) {
       const last = s.lastScanAt ? new Date(s.lastScanAt).getTime() : 0;
       return !last || now - last >= intervalMs;
     }).length,
-    queued: results.length,
+    processed: results.length,
     results
   };
 }
