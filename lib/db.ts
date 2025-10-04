@@ -1,26 +1,37 @@
 // lib/db.ts
-import { drizzle } from "drizzle-orm/better-sqlite3";
-import Database from "better-sqlite3";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 
 export type DatabaseClient = ReturnType<typeof drizzle>;
 
 const globalForDb = globalThis as typeof globalThis & {
-  __sqliteDb?: DatabaseClient;
+  __pgPool?: Pool;
+  __pgDb?: DatabaseClient;
 };
 
 /**
- * Resolve a Drizzle client using better-sqlite3 for local SQLite database.
+ * Resolve a Drizzle client using node-postgres for PostgreSQL database.
  */
 export function resolveDb(): DatabaseClient {
-  if (!globalForDb.__sqliteDb) {
-    const dbUrl = process.env.DB_URL || "file:./drizzle/local.sqlite";
+  if (!globalForDb.__pgDb) {
+    const connectionString = process.env.DATABASE_URL;
     
-    // Extract file path from file: URL
-    const dbPath = dbUrl.startsWith("file:") ? dbUrl.slice(5) : dbUrl;
+    if (!connectionString) {
+      throw new Error("DATABASE_URL environment variable is not set");
+    }
     
-    const sqlite = new Database(dbPath);
-    globalForDb.__sqliteDb = drizzle(sqlite);
+    // Create connection pool
+    if (!globalForDb.__pgPool) {
+      globalForDb.__pgPool = new Pool({
+        connectionString,
+        max: 20, // Maximum number of clients in the pool
+        idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
+        connectionTimeoutMillis: 2000, // Return an error after 2 seconds if connection could not be established
+      });
+    }
+    
+    globalForDb.__pgDb = drizzle(globalForDb.__pgPool);
   }
 
-  return globalForDb.__sqliteDb;
+  return globalForDb.__pgDb;
 }
