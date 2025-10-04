@@ -25,8 +25,8 @@ export default async function Page() {
     .innerJoin(sites, eq(changes.siteId, sites.id))
     .where(and(eq(sites.ownerId, user.id), gte(changes.occurredAt, since)));
   
-  const added = changeRows.filter((row: { changes: { type: string; }; }) => row.changes.type === 'added').length;
-  const removed = changeRows.filter((row: { changes: { type: string; }; }) => row.changes.type === 'removed').length;
+  const added = changeRows.filter((row: { changes: { type: string; }; }) => row.changes?.type === 'added').length;
+  const removed = changeRows.filter((row: { changes: { type: string; }; }) => row.changes?.type === 'removed').length;
 
   const scanRows = await db
     .select()
@@ -35,12 +35,12 @@ export default async function Page() {
     .where(and(eq(sites.ownerId, user.id), gte(scans.startedAt, since)));
   
   const total = scanRows.length;
-  const failed = scanRows.filter((row: { scans: { status: string; }; }) => row.scans.status !== 'success').length;
-  const completedScans = scanRows.filter((row: { scans: { finishedAt: any; startedAt: any; }; }) => row.scans.finishedAt && row.scans.startedAt);
+  const failed = scanRows.filter((row: { scans: { status: string; }; }) => row.scans?.status !== 'success').length;
+  const completedScans = scanRows.filter((row: { scans: { finishedAt: any; startedAt: any; }; }) => row.scans?.finishedAt && row.scans?.startedAt);
   const duration = completedScans.length > 0 
     ? completedScans.reduce((sum: number, row: { scans: { startedAt: string | number | Date; finishedAt: string | number | Date; }; }) => {
-        const start = new Date(row.scans.startedAt!).getTime();
-        const end = new Date(row.scans.finishedAt!).getTime();
+        const start = new Date(row.scans?.startedAt!).getTime();
+        const end = new Date(row.scans?.finishedAt!).getTime();
         return sum + (end - start) / 1000; // convert to seconds
       }, 0) / completedScans.length
     : 0;
@@ -94,6 +94,7 @@ export default async function Page() {
   const trendMap = new Map<string, { added: number; removed: number; updated: number }>();
   
   for (const row of trendChangeRows) {
+    if (!row.changes) continue;
     const day = getDayKey(row.changes.occurredAt);
     if (!day) continue;
     
