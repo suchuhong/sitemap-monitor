@@ -20,15 +20,15 @@ DB_URL=file:./drizzle/local.sqlite
 
 替换为 PostgreSQL 连接字符串：
 ```env
-DATABASE_URL="postgresql://postgres.umdkwhklpndfsymbadzk:[YOUR-PASSWORD]@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres"
+DATABASE_URL="postgresql://[USERNAME]:[PASSWORD]@[HOST]:[PORT]/[DATABASE]"
 ```
 
-**注意**: 请将 `[YOUR-PASSWORD]` 替换为你的实际 Supabase 数据库密码。
+**注意**: 请将占位符替换为你的实际 Supabase 数据库连接信息。
 
 ### 1.2 更新 `.env.example` 文件
 
 ```env
-DATABASE_URL="postgresql://postgres.umdkwhklpndfsymbadzk:[YOUR-PASSWORD]@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres"
+DATABASE_URL="postgresql://[USERNAME]:[PASSWORD]@[HOST]:[PORT]/[DATABASE]"
 CRON_TOKEN=<random-long-token>
 WEBHOOK_SECRET=<hmac-secret>
 APP_BASE_URL=http://localhost:3000

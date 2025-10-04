@@ -87,7 +87,7 @@
 
 **连接字符串**:
 ```
-postgresql://postgres.umdkwhklpndfsymbadzk:[PASSWORD]@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres
+postgresql://[USERNAME]:[PASSWORD]@[HOST]:[PORT]/[DATABASE]
 ```
 
 **区域**: AWS ap-southeast-1 (新加坡)  

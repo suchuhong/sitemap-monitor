@@ -138,7 +138,7 @@ ca85b38 feat: 迁移到 PostgreSQL 数据库
 
 确保 `.env` 文件包含：
 ```env
-DATABASE_URL="postgresql://postgres.umdkwhklpndfsymbadzk:20060280asd@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres"
+DATABASE_URL="postgresql://[USERNAME]:[PASSWORD]@[HOST]:[PORT]/[DATABASE]"
 ```
 
 ## 回滚方案
