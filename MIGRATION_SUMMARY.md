@@ -32,6 +32,24 @@
 
 ---
 
+## ⚡ 性能优化
+
+### Dashboard 查询优化
+- ✅ 使用 SQL 聚合查询替代应用层处理
+- ✅ 30天趋势查询优化：130K+ 行 → 聚合结果
+- ✅ 并行执行独立查询
+- ✅ 预期性能提升：5.5s → 200ms (27x)
+
+### 推荐的索引
+运行索引创建脚本以获得最佳性能：
+```bash
+DATABASE_URL="..." npx tsx scripts/create-indexes.ts
+```
+
+详见：`docs/PERFORMANCE_OPTIMIZATION.md`
+
+---
+
 ## 🔧 技术变更
 
 ### 1. 数据库配置
@@ -145,18 +163,29 @@ ca85b38 feat: 迁移到 PostgreSQL 数据库
 ## 🎯 下一步行动
 
 ### 立即执行
-1. **测试应用**
+1. **创建数据库索引**（推荐）
+   ```bash
+   DATABASE_URL="..." npx tsx scripts/create-indexes.ts
+   ```
+   这将大幅提升查询性能
+
+2. **测试应用**
    ```bash
    pnpm dev
    ```
    访问 http://localhost:3000 并测试所有功能
 
-2. **验证功能**
-   - [ ] Dashboard 统计显示正常
+3. **验证功能**
+   - [ ] Dashboard 统计显示正常（应该很快）
    - [ ] 站点列表加载正常
    - [ ] 扫描记录可查看
    - [ ] 变更历史可查看
    - [ ] 添加/编辑/删除站点功能正常
+
+4. **性能测试**（可选）
+   ```bash
+   DATABASE_URL="..." npx tsx scripts/test-dashboard-performance.ts
+   ```
 
 ### 准备部署
 3. **合并到主分支**
