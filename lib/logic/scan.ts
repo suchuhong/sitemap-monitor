@@ -19,7 +19,7 @@ type ScanJob = {
 const scanQueue: ScanJob[] = [];
 let processing = false;
 
-export async function cronScan() {
+export async function cronScan(maxSites = 3) {
   const db = resolveDb() as any;
   const now = Date.now();
   const activeSites = await db
@@ -32,8 +32,10 @@ export async function cronScan() {
     .from(sites)
     .where(eq(sites.enabled, true));
 
+  type SiteWithDue = typeof activeSites[number] & { isDue: boolean };
+
   const dueSites = activeSites
-    .map((site) => {
+    .map((site: typeof activeSites[number]): SiteWithDue => {
       const intervalMinutes = site.scanIntervalMinutes ?? 1440;
       const intervalMs = Math.max(intervalMinutes, 5) * 60 * 1000;
       const last = site.lastScanAt ? new Date(site.lastScanAt).getTime() : 0;
@@ -42,14 +44,15 @@ export async function cronScan() {
         isDue: !last || now - last >= intervalMs,
       };
     })
-    .filter((site) => site.isDue)
-    .sort((a, b) => {
+    .filter((site: SiteWithDue) => site.isDue)
+    .sort((a: SiteWithDue, b: SiteWithDue) => {
       const priorityDiff = (b.scanPriority ?? 1) - (a.scanPriority ?? 1);
       if (priorityDiff !== 0) return priorityDiff;
       const aLast = a.lastScanAt ? new Date(a.lastScanAt).getTime() : 0;
       const bLast = b.lastScanAt ? new Date(b.lastScanAt).getTime() : 0;
       return aLast - bLast;
-    });
+    })
+    .slice(0, maxSites); // 限制每次扫描的站点数量，避免 Vercel 超时
 
   const results: Array<Record<string, unknown>> = [];
   for (const site of dueSites) {
@@ -64,7 +67,17 @@ export async function cronScan() {
     }
   }
 
-  return { sitesChecked: activeSites.length, queued: dueSites.length, results };
+  return {
+    sitesChecked: activeSites.length,
+    dueCount: activeSites.filter((s: typeof activeSites[number]) => {
+      const intervalMinutes = s.scanIntervalMinutes ?? 1440;
+      const intervalMs = Math.max(intervalMinutes, 5) * 60 * 1000;
+      const last = s.lastScanAt ? new Date(s.lastScanAt).getTime() : 0;
+      return !last || now - last >= intervalMs;
+    }).length,
+    queued: results.length,
+    results
+  };
 }
 
 export async function runScanNow(siteId: string) {
@@ -213,7 +226,8 @@ async function scanOneSitemap({
 
   let res: Response;
   try {
-    res = await retry(() => fetchWithCompression(sm.url, { timeout: 12000, headers }), 2);
+    // 减少超时时间到 8 秒，避免 Vercel 10 秒限制
+    res = await retry(() => fetchWithCompression(sm.url, { timeout: 8000, headers }), 2);
   } catch (err) {
     await db
       .update(sitemaps)
@@ -278,7 +292,7 @@ async function scanOneSitemap({
     .select()
     .from(urls)
     .where(eq(urls.sitemapId, sm.id));
-  const existingMap = new Map(existing.map((row) => [row.loc, row]));
+  const existingMap = new Map(existing.map((row: typeof urls.$inferSelect) => [row.loc, row]));
 
   const toAdd: Array<{
     loc: string;
@@ -304,10 +318,12 @@ async function scanOneSitemap({
     }
   }
 
-  const toRemove = existing.filter((row) => !locMap.has(row.loc));
+  const toRemove = existing.filter((row: typeof urls.$inferSelect) => !locMap.has(row.loc));
 
   let updatedCount = 0;
 
+  // 批量更新现有 URLs
+  const urlUpdates: Array<{ id: string; changes: string[] }> = [];
   for (const { record, detail } of toKeep) {
     const changesForUrl: string[] = [];
     if (detail.lastmod && detail.lastmod !== record.lastmod) {
@@ -333,65 +349,73 @@ async function scanOneSitemap({
 
     if (changesForUrl.length) {
       updatedCount += 1;
-      await db
-        .insert(changes)
-        .values({
-          id: generateId(),
-          siteId,
-          scanId,
-          urlId: record.id,
-          type: "updated",
-          detail: `${record.loc} | ${changesForUrl.join("; ")}`,
-          source: "scanner",
-        });
+      urlUpdates.push({ id: record.id, changes: changesForUrl });
     }
   }
 
-  for (const detail of toAdd) {
-    const urlId = generateId();
-    await db
-      .insert(urls)
-      .values({
-        id: urlId,
-        siteId,
-        sitemapId: sm.id,
-        loc: detail.loc,
-        lastmod: detail.lastmod,
-        changefreq: detail.changefreq,
-        priority: detail.priority,
-        firstSeenAt: now,
-        lastSeenAt: now,
-        status: "active",
-      });
-    await db
-      .insert(changes)
-      .values({
+  // 批量插入更新的 changes
+  if (urlUpdates.length > 0) {
+    const updateChanges = urlUpdates.map(({ id, changes: changesForUrl }) => ({
+      id: generateId(),
+      siteId,
+      scanId,
+      urlId: id,
+      type: "updated" as const,
+      detail: `${toKeep.find(k => k.record.id === id)?.record.loc} | ${changesForUrl.join("; ")}`,
+      source: "scanner" as const,
+    }));
+
+    for (const change of updateChanges) {
+      await db.insert(changes).values(change);
+    }
+  }
+
+  // 批量插入新 URLs
+  if (toAdd.length > 0) {
+    const newUrls = toAdd.map(detail => ({
+      id: generateId(),
+      siteId,
+      sitemapId: sm.id,
+      loc: detail.loc,
+      lastmod: detail.lastmod,
+      changefreq: detail.changefreq,
+      priority: detail.priority,
+      firstSeenAt: now,
+      lastSeenAt: now,
+      status: "active" as const,
+    }));
+
+    for (const url of newUrls) {
+      await db.insert(urls).values(url);
+      await db.insert(changes).values({
         id: generateId(),
         siteId,
         scanId,
-        urlId,
-        type: "added",
-        detail: detail.loc,
-        source: "scanner",
+        urlId: url.id,
+        type: "added" as const,
+        detail: url.loc,
+        source: "scanner" as const,
       });
+    }
   }
 
-  for (const row of toRemove) {
-    await db
-      .update(urls)
-      .set({ status: "inactive", lastSeenAt: now })
-      .where(eq(urls.id, row.id));
-    await db
-      .insert(changes)
-      .values({
+  // 批量更新移除的 URLs
+  if (toRemove.length > 0) {
+    for (const row of toRemove) {
+      await db
+        .update(urls)
+        .set({ status: "inactive", lastSeenAt: now })
+        .where(eq(urls.id, row.id));
+      await db.insert(changes).values({
         id: generateId(),
         siteId,
         scanId,
         urlId: row.id,
-        type: "removed",
+        type: "removed" as const,
         detail: row.loc,
-        source: "scanner",
+        source: "scanner" as const,
       });
+    }
   }
 
   await db.update(sitemaps).set(sitemapUpdate).where(eq(sitemaps.id, sm.id));

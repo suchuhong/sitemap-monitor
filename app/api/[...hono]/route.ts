@@ -42,7 +42,11 @@ app.post("/cron/scan", async (c) => {
     }
   }
 
-  const result = await cronScan();
+  // 支持通过查询参数限制扫描数量，避免 Vercel 超时
+  const maxParam = new URL(c.req.url).searchParams.get("max");
+  const maxSites = maxParam ? parseInt(maxParam, 10) : 3;
+
+  const result = await cronScan(maxSites);
   return c.json(result);
 });
 
@@ -64,21 +68,21 @@ app.use("*", async (c, next) => {
   c.set("userEmail", user.email);
   c.set("db", db);
   await next();
-});app.
-post("/sites", async (c) => {
-  const schema = z.object({
-    rootUrl: z.string().url(),
-    tags: z.array(z.string()).optional(),
+}); app.
+  post("/sites", async (c) => {
+    const schema = z.object({
+      rootUrl: z.string().url(),
+      tags: z.array(z.string()).optional(),
+    });
+    const body = await c.req.json();
+    const { rootUrl, tags } = schema.parse(body);
+    const site = await discover({
+      rootUrl,
+      ownerId: c.get("userId"),
+      tags: normalizeTagsList(tags),
+    });
+    return c.json(site, 201);
   });
-  const body = await c.req.json();
-  const { rootUrl, tags } = schema.parse(body);
-  const site = await discover({
-    rootUrl,
-    ownerId: c.get("userId"),
-    tags: normalizeTagsList(tags),
-  });
-  return c.json(site, 201);
-});
 
 app.get("/sites", async (c) => {
   const ownerId = c.get("userId");
@@ -215,7 +219,7 @@ function safeParseTags(value: string | null | undefined) {
     const parsed = JSON.parse(value);
     if (Array.isArray(parsed))
       return parsed.filter((item) => typeof item === "string" && item.trim()).map((s) => s.trim());
-  } catch {}
+  } catch { }
   return [] as string[];
 }
 
@@ -233,7 +237,7 @@ app.get("/sites/export.csv", async (c) => {
     .from(sites)
     .where(eq(sites.ownerId, ownerId))
     .orderBy(desc(sites.createdAt));
-    
+
   const rows = rawRows.map((row: any) => ({
     id: row.id,
     rootUrl: row.rootUrl,
@@ -243,10 +247,10 @@ app.get("/sites/export.csv", async (c) => {
   const csv = ["id,rootUrl,robotsUrl,createdAt"]
     .concat(
       rows.map((r: any) =>
-          [r.id, r.rootUrl, r.robotsUrl ?? "", r.createdAt ?? ""]
-            .map((v: any) => `"${String(v).replaceAll('"', '""')}"`)
-            .join(","),
-        ),
+        [r.id, r.rootUrl, r.robotsUrl ?? "", r.createdAt ?? ""]
+          .map((v: any) => `"${String(v).replaceAll('"', '""')}"`)
+          .join(","),
+      ),
     )
     .join("\n");
   return c.body(csv, 200, {
@@ -278,38 +282,38 @@ app.post("/sites/:id/scan", async (c) => {
   if (!site) return c.json({ error: "not found" }, 404);
   const { scanId } = await enqueueScan(id);
   return c.json({ ok: true, status: "queued", scanId });
-});app
-.post("/sites/:id/webhooks", async (c) => {
-  type WebhookBody = { targetUrl?: unknown; secret?: unknown };
+}); app
+  .post("/sites/:id/webhooks", async (c) => {
+    type WebhookBody = { targetUrl?: unknown; secret?: unknown };
 
-  // Accept form or JSON
-  let targetUrl = "";
-  let secret = "";
-  if (c.req.header("content-type")?.includes("application/json")) {
-    const payload = (await c.req.json()) as WebhookBody;
-    if (typeof payload.targetUrl === "string") targetUrl = payload.targetUrl;
-    if (typeof payload.secret === "string") secret = payload.secret;
-  } else {
-    const form = (await c.req.parseBody()) as Record<string, unknown>;
-    if (typeof form.targetUrl === "string") targetUrl = form.targetUrl;
-    if (typeof form.secret === "string") secret = form.secret;
-  }
-  if (!targetUrl) return c.json({ error: "targetUrl required" }, 400);
-  const siteId = c.req.param("id");
-  const ownerId = c.get("userId");
-  const db = c.get("db") ?? resolveDb() as any;
-  const siteRows = await (db as any)
-    .select()
-    .from(sites)
-    .where(and(eq(sites.id, siteId), eq(sites.ownerId, ownerId)))
-    .limit(1);
-  const site = siteRows[0];
-  if (!site) return c.json({ error: "not found" }, 404);
-  await (db as any)
-    .insert(webhooks)
-    .values({ id: randomUUID(), siteId, targetUrl, secret });
-  return c.json({ ok: true });
-});
+    // Accept form or JSON
+    let targetUrl = "";
+    let secret = "";
+    if (c.req.header("content-type")?.includes("application/json")) {
+      const payload = (await c.req.json()) as WebhookBody;
+      if (typeof payload.targetUrl === "string") targetUrl = payload.targetUrl;
+      if (typeof payload.secret === "string") secret = payload.secret;
+    } else {
+      const form = (await c.req.parseBody()) as Record<string, unknown>;
+      if (typeof form.targetUrl === "string") targetUrl = form.targetUrl;
+      if (typeof form.secret === "string") secret = form.secret;
+    }
+    if (!targetUrl) return c.json({ error: "targetUrl required" }, 400);
+    const siteId = c.req.param("id");
+    const ownerId = c.get("userId");
+    const db = c.get("db") ?? resolveDb() as any;
+    const siteRows = await (db as any)
+      .select()
+      .from(sites)
+      .where(and(eq(sites.id, siteId), eq(sites.ownerId, ownerId)))
+      .limit(1);
+    const site = siteRows[0];
+    if (!site) return c.json({ error: "not found" }, 404);
+    await (db as any)
+      .insert(webhooks)
+      .values({ id: randomUUID(), siteId, targetUrl, secret });
+    return c.json({ ok: true });
+  });
 
 app.post("/sites/:id/test-webhook", async (c) => {
   const { notifyChange } = await import("@/lib/logic/notify");
@@ -460,7 +464,7 @@ app.get("/sites/:id/changes.csv", async (c) => {
     .from(changes)
     .where(whereClause)
     .orderBy(desc(changes.occurredAt));
-    
+
   const list = rawList.map((row: any) => ({
     type: row.type,
     detail: row.detail,
