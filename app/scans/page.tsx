@@ -29,7 +29,27 @@ async function getScansData(params: {
     // 构建查询条件
     const conditions = [eq(sites.ownerId, userId)];
     if (status) {
-        conditions.push(eq(scans.status, status));
+        // 映射前端状态到数据库状态
+        let dbStatus: string | undefined;
+        switch (status) {
+            case "success":
+                dbStatus = "success";
+                break;
+            case "error":
+                dbStatus = "failed";
+                break;
+            case "pending":
+                // 包含 running 和 queued
+                // 需要使用 OR 条件，这里先处理 running
+                dbStatus = "running";
+                break;
+            case "queued":
+                dbStatus = "queued";
+                break;
+        }
+        if (dbStatus) {
+            conditions.push(eq(scans.status, dbStatus));
+        }
     }
     if (site) {
         conditions.push(like(sites.rootUrl, `%${site}%`));
@@ -106,6 +126,9 @@ async function getScansData(params: {
                 break;
             case "running":
                 mappedStatus = "pending";
+                break;
+            case "queued":
+                mappedStatus = "warning"; // 使用 warning 表示排队中
                 break;
             default:
                 mappedStatus = row.error ? "error" : "warning";
@@ -197,7 +220,7 @@ export default async function ScansPage({
     const stats = {
         success: 0,
         error: 0,
-        warning: 0,
+        queued: 0,
         pending: 0,
     };
 
@@ -212,12 +235,12 @@ export default async function ScansPage({
             case "running":
                 stats.pending = row.count;
                 break;
+            case "queued":
+                stats.queued = row.count;
+                break;
             default:
-                if (row.status?.includes("error")) {
-                    stats.error += row.count;
-                } else {
-                    stats.warning += row.count;
-                }
+                // 其他未知状态
+                break;
         }
     });
 
@@ -243,28 +266,28 @@ export default async function ScansPage({
             {/* 统计卡片 */}
             <div className="grid gap-4 md:grid-cols-4">
                 <div className="rounded-lg border bg-card p-4">
-                    <div className="text-2xl font-bold text-success">
+                    <div className="text-2xl font-bold text-emerald-600">
                         {stats.success}
                     </div>
-                    <div className="text-sm text-muted-foreground">成功扫描</div>
+                    <div className="text-sm text-muted-foreground">成功</div>
                 </div>
                 <div className="rounded-lg border bg-card p-4">
-                    <div className="text-2xl font-bold text-destructive">
+                    <div className="text-2xl font-bold text-rose-600">
                         {stats.error}
                     </div>
-                    <div className="text-sm text-muted-foreground">失败扫描</div>
+                    <div className="text-sm text-muted-foreground">失败</div>
                 </div>
                 <div className="rounded-lg border bg-card p-4">
-                    <div className="text-2xl font-bold text-warning">
-                        {stats.warning}
-                    </div>
-                    <div className="text-sm text-muted-foreground">警告扫描</div>
-                </div>
-                <div className="rounded-lg border bg-card p-4">
-                    <div className="text-2xl font-bold text-info">
+                    <div className="text-2xl font-bold text-blue-600">
                         {stats.pending}
                     </div>
-                    <div className="text-sm text-muted-foreground">进行中</div>
+                    <div className="text-sm text-muted-foreground">运行中</div>
+                </div>
+                <div className="rounded-lg border bg-card p-4">
+                    <div className="text-2xl font-bold text-amber-600">
+                        {stats.queued}
+                    </div>
+                    <div className="text-sm text-muted-foreground">排队中</div>
                 </div>
             </div>
 

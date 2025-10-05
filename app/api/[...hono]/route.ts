@@ -3,7 +3,7 @@ import { handle } from "hono/vercel";
 import { getCookie } from "hono/cookie";
 import { z } from "zod";
 import { discover, rediscoverSite } from "@/lib/logic/discover";
-import { enqueueScan, cronScan } from "@/lib/logic/scan";
+import { enqueueScan, cronScan, startQueuedScans } from "@/lib/logic/scan";
 import { getSiteDetail } from "@/lib/logic/site-detail";
 import { resolveDb, type DatabaseClient } from "@/lib/db";
 import {
@@ -95,6 +95,29 @@ app.post("/cron/cleanup", async (c) => {
     cleaned: cleanedCount,
     message: `Cleaned up ${cleanedCount} stuck scans` 
   });
+});
+
+app.post("/cron/process-queue", async (c) => {
+  const expectedToken = process.env.CRON_TOKEN;
+  if (expectedToken) {
+    const authHeader = c.req.header("authorization") ?? "";
+    const bearerToken = authHeader.startsWith("Bearer ")
+      ? authHeader.slice("Bearer ".length)
+      : undefined;
+    const queryToken = new URL(c.req.url).searchParams.get("token") ?? undefined;
+    const headerToken = c.req.header("x-cron-token") ?? undefined;
+    const provided = bearerToken ?? headerToken ?? queryToken ?? "";
+    if (provided !== expectedToken) {
+      return c.json({ error: "unauthorized" }, 401);
+    }
+  }
+
+  // 启动队列中的扫描任务（异步，快速返回）
+  const maxParam = new URL(c.req.url).searchParams.get("max");
+  const maxConcurrent = maxParam ? parseInt(maxParam, 10) : 3;
+
+  const result = await startQueuedScans(maxConcurrent);
+  return c.json(result);
 });
 
 app.use("*", async (c, next) => {

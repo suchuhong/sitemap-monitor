@@ -20,10 +20,26 @@ export function ConfirmScan({ siteId }: { siteId: string }) {
               toast.error(message ?? "触发失败");
               return;
             }
-            const payload = (await r.json()) as { ok?: boolean; scanId?: string };
-            toast.success(
-              payload.scanId ? `已加入扫描队列（ID: ${payload.scanId.substring(0, 8)}…）` : "扫描任务已排队",
-            );
+            const payload = (await r.json()) as { ok?: boolean; scanId?: string; status?: string };
+
+            // 触发自定义事件，通知监控组件
+            if (payload.scanId) {
+              window.dispatchEvent(
+                new CustomEvent("scan-triggered", {
+                  detail: { scanId: payload.scanId },
+                })
+              );
+            }
+
+            const message = payload.status === "already_running"
+              ? "该站点已有扫描任务在执行中"
+              : payload.scanId
+                ? `扫描已启动（ID: ${payload.scanId.substring(0, 8)}…）`
+                : "扫描任务已排队";
+
+            toast.success(message, {
+              description: "扫描完成后将自动通知",
+            });
           } catch (err) {
             console.error("trigger scan failed", err);
             toast.error("请求异常，请稍后重试");
@@ -46,6 +62,6 @@ async function parseError(res: Response) {
       const { error } = payload as { error?: unknown };
       if (typeof error === "string") return error;
     }
-  } catch {}
+  } catch { }
   return null;
 }

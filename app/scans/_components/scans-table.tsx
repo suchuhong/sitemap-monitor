@@ -81,8 +81,8 @@ export function ScansTable({
                     <StatusIndicator status={statusMap[scan.status]}>
                         {scan.status === "success" && "成功"}
                         {scan.status === "error" && "失败"}
-                        {scan.status === "warning" && "警告"}
-                        {scan.status === "pending" && "进行中"}
+                        {scan.status === "warning" && "排队中"}
+                        {scan.status === "pending" && "运行中"}
                     </StatusIndicator>
                 );
             },

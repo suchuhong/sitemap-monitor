@@ -34,8 +34,8 @@ export function ScansFilters({ status, site }: ScansFiltersProps) {
                     <option value="">全部状态</option>
                     <option value="success">成功</option>
                     <option value="error">失败</option>
-                    <option value="warning">警告</option>
-                    <option value="pending">进行中</option>
+                    <option value="pending">运行中</option>
+                    <option value="queued">排队中</option>
                 </select>
             </div>
 

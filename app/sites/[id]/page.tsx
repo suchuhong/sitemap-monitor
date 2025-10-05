@@ -17,6 +17,7 @@ import { SiteNotificationsPanel } from "./_components/site-notifications";
 import { ScanDiffPanel } from "./_components/scan-diff-panel";
 import { ChangeList } from "./_components/change-list";
 import { SitemapTable } from "./_components/sitemap-table";
+import { ScanMonitor } from "./_components/scan-monitor";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +57,15 @@ export default async function SiteDetailPage({
 
   return (
     <div className="space-y-8">
+      {/* 扫描状态监控组件 */}
+      <ScanMonitor
+        siteId={site.id}
+        initialScans={recentScans.map((scan) => ({
+          id: scan.id,
+          status: scan.status ?? "unknown",
+        }))}
+      />
+      
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
