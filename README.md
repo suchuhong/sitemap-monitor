@@ -169,29 +169,40 @@ pnpm dev
 
 ## 文档导航
 
-### 📚 完整文档索引
+### 📚 [完整文档中心](docs/)
 
-**[📖 查看完整文档索引](docs/INDEX.md)** - 所有文档的分类导航
+**[📖 查看文档中心首页](docs/README.md)** - 包含所有文档的分类导航和推荐阅读路径
 
 ### 🚀 快速链接
 
-#### 使用指南
-- [详细功能说明](docs/guides/DETAILED_FUNCTIONALITY.md) - 完整的功能介绍和使用指南
-- [Vercel 部署指南](docs/guides/VERCEL_DEPLOYMENT_GUIDE.md) - Vercel 平台部署配置
-- [Webhook 和通知渠道指南](docs/guides/webhook-channel-guide.md) - 通知配置说明
+#### 新手入门
+- **[快速入门指南](docs/RECENT_UPDATES.md)** ⭐ - 5分钟了解最新改动
+- [详细功能说明](docs/guides/DETAILED_FUNCTIONALITY.md) - 完整的功能介绍
+- [快速开始](docs/guides/QUICK_START.md) - 从零开始的使用指南
 
-#### 故障排查
-- [扫描卡住完整修复](docs/troubleshooting/SCAN_STUCK_FIX_COMPLETE.md) - 完整的修复方案
-- [快速修复运行中扫描](docs/troubleshooting/QUICK_FIX_RUNNING_SCANS.md) - 3 步快速修复
-- [扫描不工作诊断](docs/troubleshooting/SCAN_NOT_WORKING_DIAGNOSIS.md) - 完整的诊断流程
+#### 遇到问题？
+- **[扫描卡住修复](docs/troubleshooting/QUICK_FIX_STUCK_SCAN.md)** ⚡ - 3步快速修复
+- [扫描不工作诊断](docs/troubleshooting/SCAN_NOT_WORKING_DIAGNOSIS.md) - 完整诊断流程
+- [故障排查目录](docs/troubleshooting/) - 所有问题解决方案
+
+#### 数据库迁移
+- **[立即应用迁移](docs/migration/APPLY_MIGRATIONS_NOW.md)** ⭐ - 迁移操作指南
+- [数据库迁移指南](docs/migration/DATABASE_MIGRATION_GUIDE.md) - 完整迁移说明
+- [PostgreSQL 迁移](docs/migration/POSTGRESQL_MIGRATION_GUIDE.md) - 从 SQLite 迁移
 
 #### 性能优化
 - [性能优化指南](docs/optimization/PERFORMANCE_OPTIMIZATION.md) - 系统性能优化
-- [扫描超时优化](docs/optimization/SCAN_TIMEOUT_OPTIMIZATION.md) - 扫描超时问题优化
+- [扫描超时优化](docs/optimization/SCAN_TIMEOUT_OPTIMIZATION.md) - 扫描超时问题
 
-#### 数据库迁移
-- [PostgreSQL 迁移指南](docs/migration/POSTGRESQL_MIGRATION_GUIDE.md) - 从 SQLite 迁移到 PostgreSQL
-- [迁移完成报告](docs/migration/MIGRATION_COMPLETE.md) - 完整迁移总结
+#### 部署配置
+- [Vercel 部署指南](docs/guides/VERCEL_DEPLOYMENT_GUIDE.md) - Vercel 平台部署
+- [Webhook 配置指南](docs/guides/webhook-channel-guide.md) - 通知配置说明
+
+### 📊 文档统计
+
+- **总文档数**: 60+ 个
+- **分类**: 使用指南、故障排查、数据库迁移、性能优化、功能特性
+- **最后更新**: 2025-10-05
 
 ## 开发提示
 

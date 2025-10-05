@@ -46,6 +46,7 @@ export const sitemaps = pgTable("sitemap_monitor_sitemaps", {
   lastEtag: text("last_etag"),
   lastModified: text("last_modified"),
   lastStatus: integer("last_status"),
+  lastHash: text("last_hash"),
   discoveredAt: timestamp("discovered_at").default(sql`now()`),
   updatedAt: timestamp("updated_at").default(sql`now()`),
 });

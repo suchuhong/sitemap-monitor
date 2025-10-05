@@ -15,6 +15,20 @@
       "when": 1759600000000,
       "tag": "0001_add_performance_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1759610000000,
+      "tag": "0002_optimize_url_uniques",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1759620000000,
+      "tag": "0003_add_sitemap_last_hash",
+      "breakpoints": true
     }
   ]
 }

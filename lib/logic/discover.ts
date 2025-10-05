@@ -183,44 +183,54 @@ async function collectSitemaps(initial: string[]): Promise<
   const visited = new Set<string>();
   const discovered = new Map<string, { url: string; isIndex: boolean }>();
 
-  while (queue.length && discovered.size < MAX_SITEMAP_DISCOVERY) {
-    const { url, depth } = queue.shift()!;
-    if (visited.has(url)) continue;
-    visited.add(url);
+  const CONCURRENCY = Number.parseInt(process.env.DISCOVERY_CONCURRENCY || "3", 10);
 
-    let res: Response;
-    try {
-      res = await fetchWithCompression(url, { timeout: 10000 });
-    } catch (err) {
-      console.warn("sitemap fetch failed", url, err);
-      continue;
-    }
-    if (!res.ok) continue;
+  async function worker() {
+    while (queue.length && discovered.size < MAX_SITEMAP_DISCOVERY) {
+      const next = queue.shift();
+      if (!next) break;
+      const { url, depth } = next;
+      if (visited.has(url)) continue;
+      visited.add(url);
 
-    let xml: unknown;
-    try {
-      xml = xmlParser.parse(await res.text());
-    } catch (err) {
-      console.warn("sitemap parse failed", url, err);
-      continue;
-    }
+      let res: Response;
+      try {
+        const { retry } = await import("./net");
+        res = await retry(() => fetchWithCompression(url, { timeout: 15000 }), 2);
+      } catch (err) {
+        console.warn("sitemap fetch failed", url, err);
+        continue;
+      }
+      if (!res.ok) continue;
 
-    const sitemapIndex = isRecord(xml) ? xml.sitemapindex : undefined;
-    const isIndex = Boolean(sitemapIndex);
-    discovered.set(url, { url, isIndex });
+      let xml: unknown;
+      try {
+        xml = xmlParser.parse(await res.text());
+      } catch (err) {
+        console.warn("sitemap parse failed", url, err);
+        continue;
+      }
 
-    if (isIndex && depth < MAX_INDEX_DEPTH) {
-      const nodes = extractIndexNodes(sitemapIndex);
-      for (const node of nodes) {
-        const loc = typeof node?.loc === "string" ? node.loc : undefined;
-        const nextUrl = loc ? safeResolve(loc, url) : undefined;
-        if (!nextUrl || visited.has(nextUrl) || discovered.has(nextUrl)) continue;
-        if (!isHttpUrl(nextUrl)) continue;
-        if (queue.length + discovered.size >= MAX_SITEMAP_DISCOVERY) break;
-        queue.push({ url: nextUrl, depth: depth + 1 });
+      const sitemapIndex = isRecord(xml) ? xml.sitemapindex : undefined;
+      const isIndex = Boolean(sitemapIndex);
+      discovered.set(url, { url, isIndex });
+
+      if (isIndex && depth < MAX_INDEX_DEPTH) {
+        const nodes = extractIndexNodes(sitemapIndex);
+        for (const node of nodes) {
+          const loc = typeof node?.loc === "string" ? node.loc : undefined;
+          const nextUrl = loc ? safeResolve(loc, url) : undefined;
+          if (!nextUrl || visited.has(nextUrl) || discovered.has(nextUrl)) continue;
+          if (!isHttpUrl(nextUrl)) continue;
+          if (queue.length + discovered.size >= MAX_SITEMAP_DISCOVERY) break;
+          queue.push({ url: nextUrl, depth: depth + 1 });
+        }
       }
     }
   }
+
+  const limit = Math.max(1, Number.isFinite(CONCURRENCY) && CONCURRENCY > 0 ? CONCURRENCY : 1);
+  await Promise.all(Array.from({ length: limit }, () => worker()));
 
   return Array.from(discovered.values());
 }

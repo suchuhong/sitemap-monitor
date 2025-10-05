@@ -1,7 +1,7 @@
 import { XMLParser } from "fast-xml-parser";
 import { resolveDb } from "@/lib/db";
 import { sitemaps, urls, scans, changes, sites } from "@/lib/drizzle/schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { fetchWithCompression, retry } from "./net";
 import { notifyChange, notifyScanComplete } from "./notify";
 import { generateId } from "@/lib/utils/id";
@@ -347,8 +347,30 @@ async function executeScan({ scanId, siteId }: ScanJob) {
   let updated = 0;
   const errors: string[] = [];
 
+  // 控制并发处理多个 sitemap，默认并发为 3，可通过环境变量调整
+  const CONCURRENCY = Number.parseInt(process.env.SCAN_SITEMAP_CONCURRENCY || "3", 10);
+  
+  async function mapWithConcurrency<T>(items: T[], limit: number, worker: (item: T, index: number) => Promise<void>) {
+    const l = Math.max(1, Number.isFinite(limit) && limit > 0 ? limit : 1);
+    let i = 0;
+    const workers: Promise<void>[] = [];
+    async function run() {
+      while (i < items.length) {
+        const idx = i++;
+        const item = items[idx];
+        try {
+          await worker(item, idx);
+        } catch (err) {
+          // 由 worker 内部自行处理错误聚合
+        }
+      }
+    }
+    for (let k = 0; k < l; k++) workers.push(run());
+    await Promise.all(workers);
+  }
+
   try {
-    for (const sm of smaps) {
+    await mapWithConcurrency(smaps, CONCURRENCY, async (sm) => {
       try {
         const result = await scanOneSitemap({ siteId, sitemap: sm, scanId });
         totalUrls += result.urlCount;
@@ -358,7 +380,7 @@ async function executeScan({ scanId, siteId }: ScanJob) {
       } catch (err) {
         errors.push(`${sm.url}: ${err instanceof Error ? err.message : String(err)}`);
       }
-    }
+    });
 
     const status = errors.length ? "failed" : "success";
     const finishedAt = new Date();
@@ -547,9 +569,20 @@ async function scanOneSitemap({
     throw new Error(`fetch failed with status ${res.status}`);
   }
 
+  // 读取文本并计算内容哈希，用于短路未变化的情况（当 304 未命中时）
+  const bodyText = await res.text();
+  const computedHash = await sha256Hex(bodyText);
+  sitemapUpdate.lastHash = computedHash;
+
+  if (sm.lastHash && sm.lastHash === computedHash) {
+    // 内容未变化，跳过解析与数据库 diff，提升大型 sitemap 的性能
+    await db.update(sitemaps).set(sitemapUpdate).where(eq(sitemaps.id, sm.id));
+    return { changed: false, urlsAdded: 0, urlsRemoved: 0, urlsUpdated: 0, urlCount: 0 };
+  }
+
   let xml: unknown;
   try {
-    xml = xmlParser.parse(await res.text());
+    xml = xmlParser.parse(bodyText);
   } catch (err) {
     await db.update(sitemaps).set(sitemapUpdate).where(eq(sitemaps.id, sm.id));
     throw err instanceof Error ? err : new Error(String(err));
@@ -614,91 +647,106 @@ async function scanOneSitemap({
 
   let updatedCount = 0;
 
-  // 批量更新现有 URLs
-  const urlUpdates: Array<{ id: string; changes: string[] }> = [];
+  // 将保留项拆分为有变化与无变化两类
+  const unchangedIds: string[] = [];
+  const changedKeep: Array<{
+    record: (typeof existing)[number];
+    detail: { loc: string; lastmod: string | null; changefreq: string | null; priority: string | null };
+  }> = [];
+
   for (const { record, detail } of toKeep) {
-    const changesForUrl: string[] = [];
-    if (detail.lastmod && detail.lastmod !== record.lastmod) {
-      changesForUrl.push(`lastmod ${record.lastmod ?? "-"} → ${detail.lastmod}`);
-    }
-    if (detail.changefreq && detail.changefreq !== record.changefreq) {
-      changesForUrl.push(`changefreq ${record.changefreq ?? "-"} → ${detail.changefreq}`);
-    }
-    if (detail.priority && detail.priority !== record.priority) {
-      changesForUrl.push(`priority ${record.priority ?? "-"} → ${detail.priority}`);
+    const isChanged =
+      (detail.lastmod ?? null) !== (record.lastmod ?? null) ||
+      (detail.changefreq ?? null) !== (record.changefreq ?? null) ||
+      (detail.priority ?? null) !== (record.priority ?? null) ||
+      (record.status ?? "active") !== "active"; // 保障状态同步为 active
+    if (isChanged) changedKeep.push({ record, detail });
+    else unchangedIds.push(record.id);
+  }
+
+  // 启用单事务包裹批量写入
+  await (db as any).transaction(async (tx: any) => {
+    // 1) 批量刷新 unchanged 心跳（仅 lastSeenAt/status）
+    if (unchangedIds.length > 0) {
+      await tx
+        .update(urls)
+        .set({ lastSeenAt: now, status: "active" })
+        .where(inArray(urls.id, unchangedIds));
     }
 
-    await db
-      .update(urls)
-      .set({
+    // 2) 仅更新 changedKeep 的字段，并收集 updated changes
+    const updateChangesRows: Array<{ id: string; siteId: string; scanId: string; urlId: string; type: "updated"; detail: string; source: "scanner" }> = [];
+    for (const { record, detail } of changedKeep) {
+      const parts: string[] = [];
+      if ((detail.lastmod ?? null) !== (record.lastmod ?? null)) parts.push(`lastmod ${record.lastmod ?? "-"} → ${detail.lastmod ?? "-"}`);
+      if ((detail.changefreq ?? null) !== (record.changefreq ?? null)) parts.push(`changefreq ${record.changefreq ?? "-"} → ${detail.changefreq ?? "-"}`);
+      if ((detail.priority ?? null) !== (record.priority ?? null)) parts.push(`priority ${record.priority ?? "-"} → ${detail.priority ?? "-"}`);
+
+      await tx
+        .update(urls)
+        .set({
+          lastSeenAt: now,
+          status: "active",
+          lastmod: detail.lastmod ?? null,
+          changefreq: detail.changefreq ?? null,
+          priority: detail.priority ?? null,
+        })
+        .where(eq(urls.id, record.id));
+
+      if (parts.length) {
+        updatedCount += 1;
+        updateChangesRows.push({
+          id: generateId(),
+          siteId,
+          scanId,
+          urlId: record.id,
+          type: "updated" as const,
+          detail: `${record.loc} | ${parts.join("; ")}`,
+          source: "scanner" as const,
+        });
+      }
+    }
+    if (updateChangesRows.length > 0) {
+      await tx.insert(changes).values(updateChangesRows);
+    }
+
+    // 3) 批量插入新增 URLs 及对应 changes
+    if (toAdd.length > 0) {
+      const newUrlRows = toAdd.map((detail) => ({
+        id: generateId(),
+        siteId,
+        sitemapId: sm.id,
+        loc: detail.loc,
+        lastmod: detail.lastmod,
+        changefreq: detail.changefreq,
+        priority: detail.priority,
+        firstSeenAt: now,
         lastSeenAt: now,
-        lastmod: detail.lastmod ?? record.lastmod ?? null,
-        changefreq: detail.changefreq ?? record.changefreq ?? null,
-        priority: detail.priority ?? record.priority ?? null,
-        status: "active",
-      })
-      .where(eq(urls.id, record.id));
+        status: "active" as const,
+      }));
+      await tx.insert(urls).values(newUrlRows);
 
-    if (changesForUrl.length) {
-      updatedCount += 1;
-      urlUpdates.push({ id: record.id, changes: changesForUrl });
-    }
-  }
-
-  // 批量插入更新的 changes
-  if (urlUpdates.length > 0) {
-    const updateChanges = urlUpdates.map(({ id, changes: changesForUrl }) => ({
-      id: generateId(),
-      siteId,
-      scanId,
-      urlId: id,
-      type: "updated" as const,
-      detail: `${toKeep.find(k => k.record.id === id)?.record.loc} | ${changesForUrl.join("; ")}`,
-      source: "scanner" as const,
-    }));
-
-    for (const change of updateChanges) {
-      await db.insert(changes).values(change);
-    }
-  }
-
-  // 批量插入新 URLs
-  if (toAdd.length > 0) {
-    const newUrls = toAdd.map(detail => ({
-      id: generateId(),
-      siteId,
-      sitemapId: sm.id,
-      loc: detail.loc,
-      lastmod: detail.lastmod,
-      changefreq: detail.changefreq,
-      priority: detail.priority,
-      firstSeenAt: now,
-      lastSeenAt: now,
-      status: "active" as const,
-    }));
-
-    for (const url of newUrls) {
-      await db.insert(urls).values(url);
-      await db.insert(changes).values({
+      const addChanges = newUrlRows.map((u) => ({
         id: generateId(),
         siteId,
         scanId,
-        urlId: url.id,
+        urlId: u.id,
         type: "added" as const,
-        detail: url.loc,
+        detail: u.loc,
         source: "scanner" as const,
-      });
+      }));
+      if (addChanges.length > 0) await tx.insert(changes).values(addChanges);
     }
-  }
 
-  // 批量更新移除的 URLs
-  if (toRemove.length > 0) {
-    for (const row of toRemove) {
-      await db
+    // 4) 批量失活移除 URLs 及对应 changes
+    if (toRemove.length > 0) {
+      const toRemoveIds = toRemove.map((row) => row.id);
+      await tx
         .update(urls)
         .set({ status: "inactive", lastSeenAt: now })
-        .where(eq(urls.id, row.id));
-      await db.insert(changes).values({
+        .where(inArray(urls.id, toRemoveIds));
+
+      const removeChanges = toRemove.map((row) => ({
         id: generateId(),
         siteId,
         scanId,
@@ -706,11 +754,13 @@ async function scanOneSitemap({
         type: "removed" as const,
         detail: row.loc,
         source: "scanner" as const,
-      });
+      }));
+      await tx.insert(changes).values(removeChanges);
     }
-  }
 
-  await db.update(sitemaps).set(sitemapUpdate).where(eq(sitemaps.id, sm.id));
+    // 5) 更新 sitemap 抬头信息
+    await tx.update(sitemaps).set(sitemapUpdate).where(eq(sitemaps.id, sm.id));
+  });
 
   return {
     changed: true,
@@ -735,6 +785,13 @@ function parseSitemapUrl(value: unknown): ParsedSitemapUrl | undefined {
     changefreq: typeof value.changefreq === "string" ? value.changefreq : undefined,
     priority: typeof value.priority === "string" ? value.priority : undefined,
   };
+}
+
+async function sha256Hex(input: string): Promise<string> {
+  const enc = new TextEncoder();
+  const data = enc.encode(input);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
 function extractUrlNodes(source: unknown): unknown[] {
