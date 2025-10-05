@@ -16,29 +16,9 @@ type ScanJob = {
   siteId: string;
 };
 
-export async function cronScan(maxSites = 3) {
+export async function cronScan(maxSites?: number) {
   const db = resolveDb() as any;
   const now = Date.now();
-
-  // 首先清理超时的扫描（超过 15 分钟仍在运行的）
-  const timeoutThreshold = new Date(now - 15 * 60 * 1000);
-  const runningScans = await db
-    .select()
-    .from(scans)
-    .where(eq(scans.status, "running"));
-
-  for (const scan of runningScans) {
-    if (scan.startedAt && new Date(scan.startedAt) < timeoutThreshold) {
-      await db
-        .update(scans)
-        .set({
-          status: "failed",
-          finishedAt: new Date(),
-          error: "Scan timeout - exceeded 15 minutes",
-        })
-        .where(eq(scans.id, scan.id));
-    }
-  }
 
   const activeSites = await db
     .select({
@@ -69,18 +49,20 @@ export async function cronScan(maxSites = 3) {
       const aLast = a.lastScanAt ? new Date(a.lastScanAt).getTime() : 0;
       const bLast = b.lastScanAt ? new Date(b.lastScanAt).getTime() : 0;
       return aLast - bLast;
-    })
-    .slice(0, maxSites); // 限制每次扫描的站点数量，避免 Vercel 超时
+    });
+
+  // 如果指定了 maxSites，则限制数量
+  const sitesToScan = maxSites ? dueSites.slice(0, maxSites) : dueSites;
 
   const results: Array<Record<string, unknown>> = [];
 
   // 创建扫描任务（不等待执行完成，避免阻塞）
-  for (const site of dueSites) {
+  for (const site of sitesToScan) {
     try {
       const scanId = generateId();
       await db
         .insert(scans)
-        .values({ id: scanId, siteId: site.id, status: "queued", startedAt: new Date() });
+        .values({ id: scanId, siteId: site.id, status: "queued" });
 
       // 异步执行扫描，不等待完成
       executeScan({ scanId, siteId: site.id })
@@ -127,7 +109,7 @@ export async function runScanNow(siteId: string) {
   const scanId = generateId();
   await db
     .insert(scans)
-    .values({ id: scanId, siteId, status: "running", startedAt: new Date() });
+    .values({ id: scanId, siteId, status: "queued" });
 
   try {
     return await executeScan({ scanId, siteId });
@@ -149,35 +131,77 @@ export async function enqueueScan(siteId: string) {
   const db = resolveDb() as any;
   const scanId = generateId();
 
+  console.log(`[enqueueScan] Starting for site ${siteId}`);
+
   // 检查是否已有该站点的运行中或排队中的扫描
   const existingScans = await db
     .select()
     .from(scans)
     .where(eq(scans.siteId, siteId));
 
+  console.log(`[enqueueScan] Found ${existingScans.length} existing scans for site ${siteId}`);
+
   const hasActiveScans = existingScans.some((scan: any) =>
     scan.status === "running" || scan.status === "queued"
   );
 
   if (hasActiveScans) {
+    const activeScan = existingScans.find((s: any) => s.status === "running" || s.status === "queued");
+    console.log(`[enqueueScan] Active scan found: ${activeScan?.id} (${activeScan?.status})`);
     return {
-      scanId: existingScans.find((s: any) => s.status === "running" || s.status === "queued")?.id,
+      scanId: activeScan?.id,
       status: "already_running",
       message: "该站点已有扫描任务在执行中"
     };
   }
 
   // 创建新的扫描任务
-  await db
-    .insert(scans)
-    .values({ id: scanId, siteId, status: "queued", startedAt: new Date() });
+  console.log(`[enqueueScan] Creating new scan ${scanId} for site ${siteId}`);
+  
+  try {
+    await db
+      .insert(scans)
+      .values({ id: scanId, siteId, status: "queued" });
+    
+    console.log(`[enqueueScan] Successfully created scan ${scanId}`);
+  } catch (err) {
+    console.error(`[enqueueScan] Failed to create scan:`, err);
+    throw err;
+  }
 
-  // 异步触发处理，不等待完成（避免阻塞接口）
-  processQueuedScans(1).catch(err => {
-    console.error("Background scan processing failed:", err);
-  });
+  // 检测是否在 Serverless 环境中
+  const isServerless = !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NETLIFY);
+  
+  console.log(`[enqueueScan] Environment: ${isServerless ? 'Serverless' : 'Long-running'}`);
 
-  return { scanId, status: "queued" };
+  if (isServerless) {
+    // Serverless 环境: 异步触发，不等待完成
+    console.log(`[enqueueScan] Triggering background processing (async)`);
+    processQueuedScans(1)
+      .then(result => {
+        console.log(`[enqueueScan] Background processing completed:`, result);
+      })
+      .catch(err => {
+        console.error(`[enqueueScan] Background scan processing failed:`, err);
+      });
+
+    return { scanId, status: "queued" };
+  } else {
+    // 非 Serverless 环境: 同步执行，等待完成
+    console.log(`[enqueueScan] Executing scan synchronously`);
+    try {
+      await executeScan({ scanId, siteId });
+      console.log(`[enqueueScan] Scan completed successfully`);
+      return { scanId, status: "success" };
+    } catch (err) {
+      console.error(`[enqueueScan] Scan failed:`, err);
+      return { 
+        scanId, 
+        status: "failed", 
+        error: err instanceof Error ? err.message : String(err) 
+      };
+    }
+  }
 }
 
 /**
@@ -238,12 +262,16 @@ export async function startQueuedScans(maxConcurrent = 1) {
 export async function processQueuedScans(maxConcurrent = 1) {
   const db = resolveDb() as any;
 
+  console.log(`[processQueuedScans] Starting, maxConcurrent: ${maxConcurrent}`);
+
   // 获取所有排队中的扫描任务
   const queuedScans = await db
     .select()
     .from(scans)
     .where(eq(scans.status, "queued"))
     .limit(maxConcurrent);
+
+  console.log(`[processQueuedScans] Found ${queuedScans.length} queued scans`);
 
   if (queuedScans.length === 0) {
     return { processed: 0, message: "没有待处理的扫描任务" };
@@ -252,28 +280,30 @@ export async function processQueuedScans(maxConcurrent = 1) {
   const results = [];
 
   for (const scan of queuedScans) {
+    console.log(`[processQueuedScans] Processing scan ${scan.id}`);
     try {
-      // 更新状态为运行中
-      await db
-        .update(scans)
-        .set({ status: "running", startedAt: new Date() })
-        .where(eq(scans.id, scan.id));
-
+      // executeScan 内部会将状态设置为 running，这里不需要重复设置
       // 执行扫描
       const result = await executeScan({ scanId: scan.id, siteId: scan.siteId });
       results.push({ scanId: scan.id, status: "success", result });
+      console.log(`[processQueuedScans] Scan ${scan.id} completed successfully`);
     } catch (err) {
-      console.error(`Scan ${scan.id} failed:`, err);
+      console.error(`[processQueuedScans] Scan ${scan.id} failed:`, err);
 
       // 确保失败时更新状态
-      await db
-        .update(scans)
-        .set({
-          status: "failed",
-          finishedAt: new Date(),
-          error: err instanceof Error ? err.message : String(err),
-        })
-        .where(eq(scans.id, scan.id));
+      try {
+        await db
+          .update(scans)
+          .set({
+            status: "failed",
+            finishedAt: new Date(),
+            error: err instanceof Error ? err.message : String(err),
+          })
+          .where(eq(scans.id, scan.id));
+        console.log(`[processQueuedScans] Updated scan ${scan.id} status to failed`);
+      } catch (updateErr) {
+        console.error(`[processQueuedScans] Failed to update scan status:`, updateErr);
+      }
 
       results.push({
         scanId: scan.id,
@@ -283,12 +313,15 @@ export async function processQueuedScans(maxConcurrent = 1) {
     }
   }
 
+  console.log(`[processQueuedScans] Completed, processed ${results.length} scans`);
   return { processed: results.length, results };
 }
 
 async function executeScan({ scanId, siteId }: ScanJob) {
   const db = resolveDb() as any;
   const startTime = new Date();
+  
+  console.log(`[executeScan] Starting scan ${scanId} for site ${siteId}`);
   
   let statusUpdated = false; // 标记状态是否已更新
   
@@ -297,8 +330,9 @@ async function executeScan({ scanId, siteId }: ScanJob) {
       .update(scans)
       .set({ status: "running", startedAt: startTime })
       .where(eq(scans.id, scanId));
+    console.log(`[executeScan] Updated scan ${scanId} status to running`);
   } catch (err) {
-    console.error(`Failed to update scan status to running: ${scanId}`, err);
+    console.error(`[executeScan] Failed to update scan status to running: ${scanId}`, err);
     throw err;
   }
 
@@ -346,15 +380,22 @@ async function executeScan({ scanId, siteId }: ScanJob) {
         .where(eq(scans.id, scanId));
       
       statusUpdated = true; // 标记状态已更新
+      console.log(`[executeScan] Scan ${scanId} completed with status: ${status}, totalUrls: ${totalUrls}, added: ${added}, removed: ${removed}, updated: ${updated}`);
     } catch (err) {
-      console.error(`Failed to update scan status to ${status}: ${scanId}`, err);
+      console.error(`[executeScan] Failed to update scan status to ${status}: ${scanId}`, err);
       throw err;
     }
 
-    await db
-      .update(sites)
-      .set({ lastScanAt: finishedAt, updatedAt: finishedAt })
-      .where(eq(sites.id, siteId));
+    // Update site's lastScanAt; do not let this affect scan status if it fails
+    try {
+      await db
+        .update(sites)
+        .set({ lastScanAt: finishedAt, updatedAt: finishedAt })
+        .where(eq(sites.id, siteId));
+    } catch (err) {
+      console.warn(`[executeScan] Failed to update site lastScanAt for ${siteId}`, err);
+      // Intentionally not throwing to avoid overwriting the already-updated scan status
+    }
 
     // 发送扫描完成通知（包含所有状态）
     try {
@@ -477,8 +518,8 @@ async function scanOneSitemap({
 
   let res: Response;
   try {
-    // 减少超时时间到 8 秒，避免 Vercel 10 秒限制
-    res = await retry(() => fetchWithCompression(sm.url, { timeout: 8000, headers }), 2);
+    // 使用更长的超时时间以支持大型 sitemap
+    res = await retry(() => fetchWithCompression(sm.url, { timeout: 30000, headers }), 2);
   } catch (err) {
     await db
       .update(sitemaps)

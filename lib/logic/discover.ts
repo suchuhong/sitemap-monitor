@@ -149,7 +149,7 @@ async function gatherInitialSitemaps(
 ): Promise<string[]> {
   const candidates: Set<string> = new Set();
   try {
-    const res = await fetchWithCompression(robotsUrl, { timeout: 8000 });
+    const res = await fetchWithCompression(robotsUrl, { timeout: 30000 });
     if (res.ok) {
       const txt = await res.text();
       txt.split(/\r?\n/).forEach((line) => {

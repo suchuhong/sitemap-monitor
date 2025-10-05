@@ -169,34 +169,29 @@ pnpm dev
 
 ## 文档导航
 
-### 📚 功能文档
-- [详细功能说明](docs/DETAILED_FUNCTIONALITY.md) - 完整的功能介绍和使用指南
-- [数据表使用说明](docs/DATA_TABLE_USAGE.md) - 数据库表结构和关系
-- [分页指南](docs/PAGINATION_GUIDE.md) - 分页功能实现说明
-- [Webhook 和通知渠道指南](docs/webhook-channel-guide.md) - 通知配置说明
+### 📚 完整文档索引
 
-### 🚀 开发指南
-- [阶段一指南](docs/stage-one-guide.md) - 登录、队列、批量导入
-- [阶段二指南](docs/stage-two-guide.md) - 监控能力增强
-- [阶段三指南](docs/stage-three-guide.md) - 分析与运营工具
-- [路线图](docs/roadmap.md) - 未来功能规划
+**[📖 查看完整文档索引](docs/INDEX.md)** - 所有文档的分类导航
 
-### 🎨 优化文档
-- [SEO 优化指南](docs/SEO_OPTIMIZATION_GUIDE.md) - SEO 最佳实践
-- [样式优化](docs/STYLE_OPTIMIZATION.md) - UI/UX 优化建议
+### 🚀 快速链接
 
-### 🔧 迁移文档
-- [PostgreSQL 迁移指南](docs/POSTGRESQL_MIGRATION_GUIDE.md) - 数据库迁移步骤
-- [数据迁移报告](docs/DATA_MIGRATION_REPORT.md) - 迁移详细记录
-- [性能优化指南](docs/PERFORMANCE_OPTIMIZATION.md) - 性能优化说明
-- [索引创建报告](docs/INDEX_CREATION_REPORT.md) - 数据库索引详情
-- [迁移完成报告](docs/MIGRATION_COMPLETE.md) - 完整迁移总结
-- [安全迁移报告](docs/SECURITY_MIGRATION_REPORT.md) - 安全修复记录
+#### 使用指南
+- [详细功能说明](docs/guides/DETAILED_FUNCTIONALITY.md) - 完整的功能介绍和使用指南
+- [Vercel 部署指南](docs/guides/VERCEL_DEPLOYMENT_GUIDE.md) - Vercel 平台部署配置
+- [Webhook 和通知渠道指南](docs/guides/webhook-channel-guide.md) - 通知配置说明
 
-### 📊 其他文档
-- [迁移状态](docs/MIGRATION_STATUS.md) - 当前迁移状态
-- [迁移总结](docs/MIGRATION_SUMMARY.md) - 迁移概览
-- [合并完成报告](docs/MERGE_COMPLETE.md) - 分支合并记录
+#### 故障排查
+- [扫描卡住完整修复](docs/troubleshooting/SCAN_STUCK_FIX_COMPLETE.md) - 完整的修复方案
+- [快速修复运行中扫描](docs/troubleshooting/QUICK_FIX_RUNNING_SCANS.md) - 3 步快速修复
+- [扫描不工作诊断](docs/troubleshooting/SCAN_NOT_WORKING_DIAGNOSIS.md) - 完整的诊断流程
+
+#### 性能优化
+- [性能优化指南](docs/optimization/PERFORMANCE_OPTIMIZATION.md) - 系统性能优化
+- [扫描超时优化](docs/optimization/SCAN_TIMEOUT_OPTIMIZATION.md) - 扫描超时问题优化
+
+#### 数据库迁移
+- [PostgreSQL 迁移指南](docs/migration/POSTGRESQL_MIGRATION_GUIDE.md) - 从 SQLite 迁移到 PostgreSQL
+- [迁移完成报告](docs/migration/MIGRATION_COMPLETE.md) - 完整迁移总结
 
 ## 开发提示
 

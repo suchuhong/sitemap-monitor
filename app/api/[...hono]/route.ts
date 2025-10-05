@@ -42,9 +42,9 @@ app.post("/cron/scan", async (c) => {
     }
   }
 
-  // 支持通过查询参数限制扫描数量，避免 Vercel 超时
+  // 支持通过查询参数限制扫描数量（可选）
   const maxParam = new URL(c.req.url).searchParams.get("max");
-  const maxSites = maxParam ? parseInt(maxParam, 10) : 3;
+  const maxSites = maxParam ? parseInt(maxParam, 10) : undefined;
 
   const result = await cronScan(maxSites);
   return c.json(result);
@@ -65,10 +65,11 @@ app.post("/cron/cleanup", async (c) => {
     }
   }
 
-  // 清理卡住的扫描（超过 15 分钟）
+  // 清理卡住的扫描（可配置超时时间，默认 60 分钟）
   const db = resolveDb() as any;
   const now = Date.now();
-  const timeoutThreshold = new Date(now - 15 * 60 * 1000);
+  const timeoutMinutes = parseInt(new URL(c.req.url).searchParams.get("timeout") || "60", 10);
+  const timeoutThreshold = new Date(now - timeoutMinutes * 60 * 1000);
 
   const runningScans = await db
     .select()
@@ -83,7 +84,7 @@ app.post("/cron/cleanup", async (c) => {
         .set({
           status: "failed",
           finishedAt: new Date(),
-          error: "Scan timeout - exceeded 15 minutes",
+          error: `Scan timeout - exceeded ${timeoutMinutes} minutes`,
         })
         .where(eq(scans.id, scan.id));
       cleanedCount++;
@@ -93,7 +94,8 @@ app.post("/cron/cleanup", async (c) => {
   return c.json({ 
     ok: true, 
     cleaned: cleanedCount,
-    message: `Cleaned up ${cleanedCount} stuck scans` 
+    timeoutMinutes,
+    message: `Cleaned up ${cleanedCount} stuck scans (timeout: ${timeoutMinutes} minutes)` 
   });
 });
 

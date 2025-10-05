@@ -18,6 +18,7 @@ import { ScanDiffPanel } from "./_components/scan-diff-panel";
 import { ChangeList } from "./_components/change-list";
 import { SitemapTable } from "./_components/sitemap-table";
 import { ScanMonitor } from "./_components/scan-monitor";
+import { RunningScanAlert } from "./_components/running-scan-alert";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +60,15 @@ export default async function SiteDetailPage({
     <div className="space-y-8">
       {/* 扫描状态监控组件 */}
       <ScanMonitor
+        siteId={site.id}
+        initialScans={recentScans.map((scan) => ({
+          id: scan.id,
+          status: scan.status ?? "unknown",
+        }))}
+      />
+
+      {/* 运行中扫描警告 */}
+      <RunningScanAlert
         siteId={site.id}
         initialScans={recentScans.map((scan) => ({
           id: scan.id,

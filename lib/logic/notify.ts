@@ -182,7 +182,7 @@ async function dispatchWebhook(channel: ChannelRecord, envelope: Record<string, 
   const body = JSON.stringify(envelope);
   const secret = channel.secret ?? process.env.WEBHOOK_SECRET ?? "";
   const sig = await createHmacSignature(secret, body);
-  const timeoutMs = normalizeTimeout(process.env.WEBHOOK_TIMEOUT_MS, 8000);
+  const timeoutMs = normalizeTimeout(process.env.WEBHOOK_TIMEOUT_MS, 30000);
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -281,7 +281,7 @@ async function getEmailTransporter() {
 }
 
 async function dispatchSlack(channel: ChannelRecord, envelope: NotificationEnvelope) {
-  const timeoutMs = normalizeTimeout(process.env.SLACK_TIMEOUT_MS, 8000);
+  const timeoutMs = normalizeTimeout(process.env.SLACK_TIMEOUT_MS, 30000);
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -412,7 +412,7 @@ async function dispatchEmailScanComplete(channel: ChannelRecord, envelope: Notif
 }
 
 async function dispatchSlackScanComplete(channel: ChannelRecord, envelope: NotificationEnvelope) {
-  const timeoutMs = normalizeTimeout(process.env.SLACK_TIMEOUT_MS, 8000);
+  const timeoutMs = normalizeTimeout(process.env.SLACK_TIMEOUT_MS, 30000);
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {
